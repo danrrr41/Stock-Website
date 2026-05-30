@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "name": "notify-after-agent",
+            "type": "command",
+            "command": "python scripts/notify.py",
+            "description": "Notify with 2-second beeps when the agent finishes a turn"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "name": "notify-on-permission",
+            "type": "command",
+            "command": "python scripts/notify.py",
+            "description": "Notify with 2-second beeps when waiting for permission or input"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>MDD Pro Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // 인증 체크: 세션 인증이 없으면 대문으로 리다이렉트
+        if (sessionStorage.getItem('site_auth') !== 'true') {
+            location.href = '/';
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', 'Malgun Gothic', sans-serif; overflow: hidden; height: 100vh; }
+        .text-input { border-bottom: 2px solid #e2e8f0; outline: none; font-weight: bold; text-align: center; transition: border-color 0.2s; }
+        .text-input:focus { border-bottom-color: #3b82f6; }
+        #fav-menu { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; z-index: 100; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        #fav-menu button { width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 600; }
+        #fav-menu button:hover { background-color: #f1f5f9; }
+        .site-nav { position: relative; display: inline-block; }
+        .site-nav-btn { 
+            background: none; 
+            border: none; 
+            font-size: 2rem; 
+            font-weight: 700; 
+            cursor: pointer; 
+            padding: 0; 
+            display: flex; 
+            align-items: center; 
+            gap: 5px; 
+            color: #111;
+            font-family: 'Inter', 'Malgun Gothic', sans-serif;
+        }
+        .site-dropdown { display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 2000; min-width: 200px; padding: 8px; margin-top: 10px; }
+        .site-dropdown a { display: block; padding: 10px 14px; text-decoration: none; color: #444; font-weight: 600; border-radius: 8px; font-size: 0.9rem; }
+        .site-dropdown a:hover { background: #f8fafc; }
+        .site-dropdown a.active { color: #111; background: #f0f0f0; }
+    </style>
+</head>
+<body class="bg-[#f1f5f9] flex flex-col p-4">
+    <nav class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-6">
+            <div class="site-nav">
+                <button class="site-nav-btn" onclick="toggleSiteDropdown()">📊 MDD Calculator Pro</button>
+                <div id="site-dropdown" class="site-dropdown text-left">
+                    <a href="/stock">📈 Stock Overview Pro</a>
+                    <a href="/mdd" class="active">📊 MDD Calculator Pro</a>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 bg-gray-50 border rounded-xl px-4 py-2">
+                <div class="flex items-center gap-2 relative">
+                    <span class="text-xs font-bold text-gray-500">종목 :</span>
+                    <div class="relative flex items-center bg-white border rounded overflow-visible">
+                        <input id="code" type="text" value="NFLX" onkeydown="if(event.key==='Enter') calculate()" class="w-24 px-2 py-1 text-sm uppercase font-bold text-center outline-none">
+                        <button onclick="toggleFavMenu()" class="bg-gray-100 border-l px-2 py-1 text-xs hover:bg-gray-200">▼</button>
+                        <div id="fav-menu">
+                            <!-- Dynamically loaded -->
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-bold text-gray-500 border-l pl-4">
+                    <span>시작일 :</span>
+                    <input id="start" type="text" value="2004-01-01" maxlength="10" placeholder="YYYY-MM-DD" class="text-input w-28 py-1" onfocus="onFocusDate(this)" onblur="onBlurDate(this)" oninput="handleDateInput(this)" onkeydown="if(event.key==='Enter') this.blur()">
+                </div>
+                <div class="flex items-center gap-2 text-xs font-bold text-gray-500 border-l pl-4">
+                    <span>종료일 :</span>
+                    <input id="end" type="text" value="2026-01-30" maxlength="10" placeholder="YYYY-MM-DD" class="text-input w-28 py-1" onfocus="onFocusDate(this)" onblur="onBlurDate(this)" oninput="handleDateInput(this)" onkeydown="if(event.key==='Enter') this.blur()">
+                    <label class="flex items-center gap-1 ml-2 cursor-pointer text-blue-600">
+                        <input id="use_today" type="checkbox" onchange="toggleEndDate(); calculate();" checked>
+                        <span>오늘 날짜 사용</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-gray-500">회복률 기준 :</span>
+                <input id="threshold" type="number" value="80" step="5" onchange="calculate()" onkeydown="if(event.key==='Enter') calculate()" class="w-16 border rounded px-2 py-1 font-bold text-blue-600 text-center">
+                <span class="text-xs font-bold text-gray-500">%</span>
+            </div>
+            <button onclick="location.href='/settings?list_type=mdd'" class="bg-gray-800 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition">종목 수정</button>
+            <button onclick="calculate()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">적용</button>
+        </div>
+    </nav>
+    <main class="flex-1 flex gap-4 overflow-hidden min-h-0">
+        <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col pt-3 px-4 pb-4 overflow-hidden">
+            <div class="grid grid-cols-4 gap-4 mb-1.5 shrink-0 text-center">
+                <div class="bg-blue-50 p-2 rounded-lg border border-blue-100">
+                    <p class="text-[9px] uppercase text-blue-500 font-extrabold mb-0.5">현재가</p>
+                    <p id="last-price" class="text-lg font-bold text-blue-700">$0.00 <span class="text-sm opacity-70">(0.0%)</span></p>
+                </div>
+                <div class="bg-orange-50 p-2 rounded-lg border border-orange-100">
+                    <p class="text-[9px] uppercase text-orange-500 font-extrabold mb-0.5">기준가</p>
+                    <p id="threshold-price" class="text-lg font-bold text-orange-600">$0.00 <span class="text-sm opacity-70">(0.0%)</span></p>
+                </div>
+                <div class="bg-red-50 p-2 rounded-lg border border-red-100">
+                    <p class="text-[9px] uppercase text-red-500 font-extrabold mb-0.5">MDD</p>
+                    <p id="mdd-val" class="text-lg font-bold text-red-600">0.00%</p>
+                </div>
+                <div class="bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <p class="text-[9px] uppercase text-gray-500 font-extrabold mb-0.5">최고가</p>
+                    <p id="peak-price" class="text-lg font-bold text-gray-800">$0.00</p>
+                </div>
+            </div>
+            <div id="chart-container" class="flex-1 w-full relative">
+                <div id="chart" class="absolute inset-0"></div>
+            </div>
+        </div>
+        <div class="w-80 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col p-4 overflow-hidden">
+            <h3 class="text-sm font-bold mb-3 shrink-0">📊 MDD 통계 Analysis</h3>
+            <div class="flex-1 flex flex-col min-h-0">
+                <table class="w-full text-[11px] text-center border-collapse">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr><th class="py-1 border-b font-bold">MDD기준</th><th class="py-1 border-b font-bold">회복률</th><th class="py-1 border-b font-bold">비중</th></tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <script>
+        let chart = null;
+        let oldPositions = null;
+
+        async function loadMddTickers() {
+            try {
+                const res = await fetch('/api/settings/tickers?list_type=mdd');
+                const data = await res.json();
+                const tickers = data.tickers.split(',').map(t => t.trim());
+                document.getElementById('fav-menu').innerHTML = tickers.map(t => 
+                    `<button onclick="setSymbol('${t}')">${t}</button>`
+                ).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        async function calculate() {
+            const btn = document.querySelector('button[onclick="calculate()"]');
+            btn.innerText = "...";
+            let startStr = document.getElementById('start').value;
+            let endStr = document.getElementById('use_today').checked ? new Date().toISOString().split('T')[0] : document.getElementById('end').value;
+            try {
+                const currentThreshold = parseFloat(document.getElementById('threshold').value);
+                const params = new URLSearchParams({
+                    code: document.getElementById('code').value.toUpperCase(),
+                    start: startStr, end: endStr, threshold: currentThreshold
+                });
+                const res = await fetch(`/api/calculate?${params.toString()}`);
+                const data = await res.json();
+                document.getElementById('last-price').innerHTML = `$${data.stats.last_price} <span class="text-sm font-semibold opacity-70">(${data.stats.last_val}%)</span>`;
+                document.getElementById('mdd-val').innerText = `${data.stats.max_mdd}%`;
+                document.getElementById('threshold-price').innerHTML = `$${data.stats.price_at_threshold} <span class="text-sm font-semibold opacity-70">(${data.threshold_line}%)</span>`;
+                document.getElementById('peak-price').innerText = `$${data.stats.peak_price}`;
+                document.getElementById('table-body').innerHTML = data.table_data.map(row => {
+                    const isAboveThreshold = row.recovery >= currentThreshold;
+                    const recoveryBg = isAboveThreshold ? 'rgba(255, 217, 102, 1)' : `rgba(255, 242, 204, ${row.recovery/100})`;
+                    return `
+                    <tr class="border-b border-gray-50 h-[23.5px]">
+                        <td class="py-0 font-mono font-bold text-gray-600">${row.mdd}</td>
+                        <td class="py-0" style="background-color: ${recoveryBg}">${row.recovery}%</td>
+                        <td class="py-0" style="background-color: rgba(244, 177, 131, ${row.weight/20})">${row.weight}%</td>
+                    </tr>`
+                }).join('');
+                
+                const options = {
+                    series: [{ name: '낙폭', data: data.chart_data }],
+                    chart: { type: 'area', height: '100%', width: '100%', animations: { enabled: true }, toolbar: { show: false } },
+                    dataLabels: { enabled: false }, colors: ['#ef4444'],
+                    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05, colorStops: [{ offset: 0, color: "#ef4444", opacity: 0.3 }, { offset: 100, color: "#ef4444", opacity: 0.05 }] } },
+                    stroke: { width: 1.5, curve: 'straight' },
+                    grid: { padding: { top: -5, bottom: 20 } },
+                    xaxis: { type: 'datetime', labels: { format: 'yyyy-MM-dd', style: { fontSize: '10px', fontWeight: 'bold' }, offsetY: 5 } },
+                    yaxis: { max: 0, min: (Math.floor(data.stats.max_mdd / 10) * 10) - 10, labels: { formatter: v => v.toFixed(0) + "%", style: { fontSize: '10px' } } },
+                    tooltip: { x: { format: 'yyyy-MM-dd' } },
+                    annotations: {
+                        yaxis: [{ id: 'baseline', y: data.threshold_line, borderColor: '#334155', strokeDashArray: 4, label: { text: `기준선 ${data.threshold_line}%`, position: 'left', textAnchor: 'start', style: { background: '#334155', color: '#fff' } } }],
+                        points: [
+                            { id: 'mdd-pt', x: new Date(data.stats.max_mdd_date).getTime(), y: data.stats.max_mdd, marker: { size: 6, fillColor: '#ef4444', strokeColor: '#fff', strokeWidth: 2 }, label: { text: `MDD: ${data.stats.max_mdd}% (${data.stats.max_mdd_date})`, borderColor: '#ef4444', style: { color: '#fff', background: '#ef4444' } } },
+                            { id: 'cur-pt', x: new Date(data.stats.last_date).getTime(), y: data.stats.last_val, marker: { size: 6, fillColor: '#2563eb', strokeColor: '#fff', strokeWidth: 2 }, label: { text: `현재: ${data.stats.last_val}%`, borderColor: '#2563eb', textAnchor: 'end', offsetX: -10, style: { color: '#fff', background: '#2563eb' }, offsetY: data.stats.last_val === 0 ? 32 : 0 } }
+                        ]
+                    }
+                };
+                if (!chart) { chart = new ApexCharts(document.querySelector("#chart"), options); chart.render(); }
+                else { chart.updateOptions(options, false, true, true); }
+            } catch (e) { console.error(e); } finally { btn.innerText = "적용"; }
+        }
+
+        function toggleSiteDropdown() {
+            const d = document.getElementById('site-dropdown');
+            d.style.display = d.style.display === 'block' ? 'none' : 'block';
+        }
+        function toggleFavMenu() {
+            const m = document.getElementById('fav-menu');
+            m.style.display = m.style.display === 'block' ? 'none' : 'block';
+        }
+        function setSymbol(s) {
+            document.getElementById('code').value = s;
+            document.getElementById('fav-menu').style.display = 'none';
+            calculate();
+        }
+        function toggleEndDate() {
+            const useToday = document.getElementById('use_today').checked;
+            const endInput = document.getElementById('end');
+            if (useToday) {
+                endInput.value = new Date().toISOString().split('T')[0];
+                endInput.classList.add('bg-gray-100');
+                endInput.readOnly = true;
+            } else {
+                endInput.classList.remove('bg-gray-100');
+                endInput.readOnly = false;
+            }
+        }
+        function onFocusDate(el) { if (!el.readOnly) el.value = el.value.replace(/-/g, ''); }
+        function onBlurDate(el) { if (!el.readOnly) handleDateInput(el); }
+        function handleDateInput(el) {
+            let val = el.value.replace(/\D/g, '');
+            if (val.length >= 8) {
+                el.value = `${val.slice(0,4)}-${val.slice(4,6)}-${val.slice(6,8)}`;
+            }
+        }
+
+        window.onclick = (e) => { 
+            if (!e.target.closest('.relative')) {
+                const favMenu = document.getElementById('fav-menu');
+                if (favMenu) favMenu.style.display = 'none';
+            }
+            if (!e.target.closest('.site-nav')) {
+                const siteDropdown = document.getElementById('site-dropdown');
+                if (siteDropdown) siteDropdown.style.display = 'none';
+            }
+        };
+        window.onload = () => { toggleEndDate(); loadMddTickers(); calculate(); };
+    </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>종목 수정 - Stock Overview</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .settings-container {
+            max-width: 600px;
+            margin: 100px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        h2 { margin-top: 0; margin-bottom: 20px; font-weight: 700; }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            resize: none;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        button {
+            padding: 12px 25px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .save-btn { background: #111; color: white; }
+        .save-btn:hover { background: #333; }
+        .cancel-btn { background: #f0f0f0; color: #666; }
+        .cancel-btn:hover { background: #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <h2>종목 리스트 수정</h2>
+        <p style="color: #888; font-size: 0.9rem; margin-bottom: 15px;">티커를 줄바꿈(Enter)으로 구분하여 입력하세요.</p>
+        <textarea id="ticker-input" placeholder="예:&#13;&#10;AAPL&#13;&#10;TSLA&#13;&#10;GOOG"></textarea>
+        <div class="button-group">
+            <button class="cancel-btn" onclick="goBack()">저장 안하고 나가기</button>
+            <button class="save-btn" onclick="saveAndExit()">저장하고 나가기</button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const listType = urlParams.get('list_type') || 'bookmark';
+        
+        if (listType === 'mdd') {
+            document.querySelector('h2').innerText = 'MDD 즐겨찾기 수정';
+            document.title = 'MDD 종목 수정 - MDD Pro';
+        }
+
+        // 현재 티커 목록 불러오기
+        async function loadTickers() {
+            try {
+                const response = await fetch(`/api/settings/tickers?list_type=${listType}`);
+                const data = await response.json();
+                document.getElementById('ticker-input').value = data.tickers.split(',').map(t => t.trim()).join('\n');
+            } catch (e) {
+                alert('목록을 불러오는 데 실패했습니다.');
+            }
+        }
+
+        async function saveAndExit() {
+            const content = document.getElementById('ticker-input').value;
+            try {
+                const response = await fetch('/api/settings/tickers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tickers: content, list_type: listType })
+                });
+                if (response.ok) {
+                    window.location.href = listType === 'mdd' ? '/mdd' : '/';
+                } else {
+                    alert('저장에 실패했습니다.');
+                }
+            } catch (e) {
+                alert('통신 오류가 발생했습니다.');
+            }
+        }
+
+        function goBack() {
+            window.location.href = listType === 'mdd' ? '/mdd' : '/';
+        }
+
+        loadTickers();
+    </script>
+</body>
+</html>

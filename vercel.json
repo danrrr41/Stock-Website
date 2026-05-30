@@ -1,0 +1,24 @@
+{
+  "builds": [
+    {
+      "src": "stock_overview/backend/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "stock_overview/backend/main.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "stock_overview/backend/main.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/update",
+      "schedule": "0 22 * * *"
+    }
+  ]
+}

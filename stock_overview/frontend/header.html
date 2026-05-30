@@ -1,0 +1,13 @@
+<div class="stock-header">
+    <div class="ticker-group">
+        <div class="ticker" onclick="copyAiRawData('{{ticker}}')">{{ticker}}</div>
+        <div class="company-name">{{name}}</div>
+    </div>
+    <div class="price-info">
+        <div class="current-price">{{currency}}{{price}}</div>
+        <div class="change-pct-group">
+            <span class="change-pct {{changeClass}}">{{changeSign}}{{changePct}}%</span>
+            <span class="change-pct {{totalChangeClass}}">({{totalChangeSign}}{{totalChangePct}}%)</span>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Overview Pro</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        // 인증 체크: 세션 인증이 없으면 대문으로 리다이렉트
+        if (sessionStorage.getItem('site_auth') !== 'true') {
+            location.href = '/';
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        .site-nav { position: relative; display: inline-block; }
+        .site-nav-btn { 
+            background: none; 
+            border: none; 
+            font-size: 2rem; 
+            font-weight: 700; 
+            cursor: pointer; 
+            padding: 0; 
+            display: flex; 
+            align-items: center; 
+            gap: 5px; 
+            color: #111;
+            font-family: 'Inter', 'Malgun Gothic', sans-serif;
+        }
+        .site-dropdown { display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 2000; min-width: 220px; padding: 8px; margin-top: 10px; }
+        .site-dropdown a { display: block; padding: 12px 16px; text-decoration: none; color: #444; font-weight: 600; border-radius: 8px; font-size: 0.95rem; }
+        .site-dropdown a:hover { background: #f5f5f7; }
+        .site-dropdown a.active { color: #111; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="site-nav">
+                <button class="site-nav-btn" onclick="toggleSiteDropdown()">📈 Stock Overview Pro</button>
+                <div id="site-dropdown" class="site-dropdown">
+                    <a href="/stock" class="active">📈 Stock Overview Pro</a>
+                    <a href="/mdd">📊 MDD Calculator Pro</a>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="list-selector" onchange="changeList()" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-weight: 600; cursor: pointer; background: white;">
+                    <option value="bookmark">내 즐겨찾기</option>
+                    <option value="nasdaq100">나스닥 100</option>
+                </select>
+                <div style="display: flex; gap: 5px; align-items: center;">
+                    <select id="sort-selector" onchange="resetAndSort()" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-weight: 600; cursor: pointer; background: white;">
+                        <option value="default">기본 순서</option>
+                        <option value="change">등락률</option>
+                        <option value="total_change">60일 등락률</option>
+                        <option value="rsi">RSI</option>
+                        <option value="mfi">MFI</option>
+                        <option value="adx">ADX</option>
+                        <option value="pb">%B</option>
+                        <option value="dmi">DMI</option>
+                        <option value="tech_score">기술적 수치 합산</option>
+                        <option value="tech_signal">기술적 신호 개수</option>
+                    </select>
+                    <button id="sort-direction-btn" onclick="toggleSortDirection()" style="padding: 10px 12px; background: white; border: 1px solid #ddd; border-radius: 8px; font-weight: 800; cursor: pointer; min-width: 45px;">
+                        ↓
+                    </button>
+                </div>
+                <button id="edit-btn" onclick="location.href='/settings'" style="padding: 10px 20px; background: #111; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">종목 수정</button>
+            </div>
+        </div>
+        <div id="stock-grid" class="stock-grid">
+            <div class="loading">데이터 로딩 중...</div>
+        </div>
+    </div>
+    <div id="error-popup">
+        <div class="error-icon">!</div>
+        <div id="error-message">문제가 발생했습니다.</div>
+    </div>
+    <div id="toast"></div>
+    <script src="/static/charts_main.js?v=1.1"></script>
+    <script src="/static/charts_macd.js?v=1.1"></script>
+    <script src="/static/charts_vol.js?v=1.1"></script>
+    <script src="/static/charts_popup.js?v=1.1"></script>
+    <script src="/static/script.js?v=1.1"></script>
+    <script>
+        let currentSortDirection = 'desc';
+        function toggleSiteDropdown() {
+            const d = document.getElementById('site-dropdown');
+            d.style.display = d.style.display === 'block' ? 'none' : 'block';
+        }
+        window.onclick = function(event) {
+            if (!event.target.closest('.site-nav')) {
+                document.getElementById('site-dropdown').style.display = 'none';
+            }
+        }
+        function changeList() {
+            const listType = document.getElementById('list-selector').value;
+            const editBtn = document.getElementById('edit-btn');
+            editBtn.style.display = (listType === 'bookmark') ? 'block' : 'none';
+            fetchStockData(listType);
+        }
+        function resetAndSort() {
+            currentSortDirection = 'desc';
+            document.getElementById('sort-direction-btn').innerText = '↓';
+            applySort();
+        }
+        function toggleSortDirection() {
+            const btn = document.getElementById('sort-direction-btn');
+            currentSortDirection = (currentSortDirection === 'desc') ? 'asc' : 'desc';
+            btn.innerText = (currentSortDirection === 'desc') ? '↓' : '↑';
+            applySort();
+        }
+        function applySort() {
+            renderStockCards(currentStocksData);
+        }
+    </script>
+</body>
+</html>

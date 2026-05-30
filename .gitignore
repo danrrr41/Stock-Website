@@ -1,0 +1,20 @@
+# 가상환경 격리
+venv/
+.venv/
+env/
+
+# 파이썬 캐시 파일 제거
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 툴 및 운영체제 임시 파일
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 로컬 환경 변수 파일 (비밀번호나 API 키가 혹시 들어있다면 보호)
+.env
