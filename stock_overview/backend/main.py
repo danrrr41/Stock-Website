@@ -49,13 +49,16 @@ async def migrate_file_to_redis():
 async def get_stocks(list_type: Optional[str] = "bookmark"):
     return stock_service.get_stock_data(list_type)
 
+
 @app.get("/api/cron/update")
-async def cron_update(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    token = authorization.split(" ")[1]
-    if token != CRON_SECRET:
-        raise HTTPException(status_code=401, detail="Invalid token")
+async def cron_update():
+    # 임시로 보안 인증 과정 전체 주석(비활성화) 처리
+    # if not authorization or not authorization.startswith("Bearer "):
+    #     raise HTTPException(status_code=401, detail="Unauthorized")
+    # token = authorization.split(" ")[1]
+    # if token != CRON_SECRET:
+    #     raise HTTPException(status_code=401, detail="Invalid token")
+
     res = stock_service.update_all_stocks()
     return res
 
