@@ -2,10 +2,11 @@ import redis
 import json
 import os
 
-# REDIS_URL 환경변수 필수 체크
-REDIS_URL = os.getenv("REDIS_URL")
+# Vercel이 주는 KV_URL을 먼저 찾고, 없으면 REDIS_URL을 찾도록 유연하게 변경
+REDIS_URL = os.getenv("KV_URL") or os.getenv("REDIS_URL")
+
 if not REDIS_URL:
-    raise EnvironmentError("REDIS_URL 환경변수가 설정되지 않았습니다.")
+    raise EnvironmentError("REDIS_URL(또는 KV_URL) 환경변수가 설정되지 않았습니다.")
 
 client = redis.from_url(REDIS_URL, decode_responses=True)
 
