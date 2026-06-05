@@ -117,7 +117,7 @@ function renderMainChart(selector, stock) {
             ] : []
         },
         tooltip: {
-            enabled: true, shared: false, intersect: false, followCursor: true,
+            enabled: true, shared: true, intersect: false,
             custom: function({ dataPointIndex }) {
                 try {
                     const d = stock.dates[dataPointIndex];

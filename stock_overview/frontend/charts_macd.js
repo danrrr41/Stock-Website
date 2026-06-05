@@ -26,21 +26,39 @@ function renderMacdChart(selector, stock) {
             { name: 'MACD', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.macd[i] })) },
             { name: 'Signal', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.macd_signal[i] })) }
         ],
-        chart: { 
-            height: 100, 
-            type: 'line', 
+        chart: {
+            height: 100,
+            type: 'line',
             toolbar: { show: false },
             animations: { enabled: false },
-            sparkline: { enabled: true }
+            parentHeightOffset: 0
         },
-        tooltip: { enabled: false },
-        colors: ['#b2bec3', '#2980b9', '#e67e22'], 
+        tooltip: {
+            enabled: true, shared: true, intersect: false,
+            custom: function({ dataPointIndex }) {
+                try {
+                    const d = stock.dates[dataPointIndex];
+                    const kst = (typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d;
+                    const m = stock.macd[dataPointIndex], s = stock.macd_signal[dataPointIndex];
+                    return '<div style="padding:4px 8px;font-size:11px;font-weight:700;">' + kst +
+                        '<br><span style="color:#666;font-weight:600;">MACD ' + (m != null ? m.toFixed(2) : '-') +
+                        ' / Sig ' + (s != null ? s.toFixed(2) : '-') + '</span></div>';
+                } catch (e) { return ''; }
+            }
+        },
+        colors: ['#b2bec3', '#2980b9', '#e67e22'],
         stroke: { width: [0, 2.5, 2] },
-        yaxis: { 
-            min: -dynamicMax, 
-            max: dynamicMax 
+        xaxis: {
+            type: 'category', labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false },
+            crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
+            tooltip: { enabled: true, formatter: function(v) { try { return (typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v; } catch (e) { return v; } } }
         },
-        grid: { show: false },
+        yaxis: {
+            min: -dynamicMax,
+            max: dynamicMax,
+            labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false }
+        },
+        grid: { show: false, padding: { top: 0, bottom: 0, left: 0, right: 0 } },
         legend: { show: false }
     };
 

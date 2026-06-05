@@ -243,7 +243,9 @@ function renderChart(sel, fu) {
         xaxis: {
             type: 'category', categories: dates, tickAmount: 6,
             labels: { rotate: 0, hideOverlappingLabels: true, style: { fontSize: '10px', colors: '#999' }, formatter: v => (v ? String(v).slice(2) : '') },
-            axisTicks: { show: false }, tooltip: { enabled: false }
+            axisTicks: { show: false },
+            crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
+            tooltip: { enabled: true }
         },
         yaxis: { labels: { style: { fontSize: '10px', colors: '#999' }, formatter: v => (v != null ? v.toFixed(0) : '') } },
         stroke: { width: widths, dashArray: dashes, curve: 'straight' },
@@ -252,7 +254,17 @@ function renderChart(sel, fu) {
         markers: { size: 0 },
         legend: { show: false },
         grid: { borderColor: '#f4f4f4' },
-        tooltip: { enabled: false },
+        tooltip: {
+            enabled: true, shared: true, intersect: false,
+            custom: function({ dataPointIndex }) {
+                try {
+                    const d = fu.dates[dataPointIndex];
+                    const o = fu.ohlc[dataPointIndex];
+                    return '<div style="padding:4px 8px;font-size:11px;font-weight:700;">' + d +
+                        '<br><span style="color:#666;font-weight:600;">종가 ' + (o ? o.c : '-') + '</span></div>';
+                } catch (e) { return ''; }
+            }
+        },
         annotations: { yaxis: [{ y: fu.buy_price, borderColor: '#7c3aed', strokeDashArray: 6, borderWidth: 2 }] }
     };
     const el = document.querySelector(sel);
