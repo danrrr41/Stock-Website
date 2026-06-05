@@ -31,10 +31,10 @@ function renderMacdChart(selector, stock) {
             type: 'line',
             toolbar: { show: false },
             animations: { enabled: false },
-            parentHeightOffset: 0
+            sparkline: { enabled: true }
         },
         tooltip: {
-            enabled: true, shared: true, intersect: false,
+            enabled: true, shared: true, intersect: false, followCursor: true,
             custom: function({ dataPointIndex }) {
                 try {
                     const d = stock.dates[dataPointIndex];
