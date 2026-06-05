@@ -48,6 +48,7 @@ function renderMacdChart(selector, stock) {
         },
         colors: ['#b2bec3', '#2980b9', '#e67e22'],
         stroke: { width: [0, 2.5, 2] },
+        markers: { size: 0, hover: { size: 0, sizeOffset: 0 } },
         xaxis: {
             type: 'category', labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false },
             crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },

@@ -40,6 +40,7 @@ function renderVolChart(selector, stock) {
             width: [0, 1.5, 1.5],
             curve: 'smooth'
         },
+        markers: { size: 0, hover: { size: 0, sizeOffset: 0 } },
         // 회색(막대), 오렌지(5MA), 초록(20MA)
         colors: ['#b2bec3', '#ff9f43', '#27ae60'],
         xaxis: {

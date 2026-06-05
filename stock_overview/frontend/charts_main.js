@@ -96,7 +96,8 @@ function renderMainChart(selector, stock) {
             opacity: [0.6, 1, 1, 1, 1, 1, 1, 1] 
         },
         markers: {
-            size: 0
+            size: 0,
+            hover: { size: 0, sizeOffset: 0 }
         },
         annotations: {
             yaxis: isBreakthrough ? [

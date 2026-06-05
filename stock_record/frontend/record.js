@@ -190,7 +190,7 @@ function showFollowupPopup(type, key, event) {
         chart: { height: 120, type: 'line', animations: { enabled: false }, toolbar: { show: false }, zoom: { enabled: false }, sparkline: { enabled: true } },
         stroke: { width: 2, curve: 'smooth' },
         colors,
-        grid: { show: false }, legend: { show: false }, markers: { size: 0 },
+        grid: { show: false }, legend: { show: false }, markers: { size: 0, hover: { size: 0, sizeOffset: 0 } },
         xaxis: { categories: dates, labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
         yaxis: { min: yMin, max: yMax, labels: { show: false } },
         annotations: { yaxis: annotations },
@@ -251,7 +251,7 @@ function renderChart(sel, fu) {
         stroke: { width: widths, dashArray: dashes, curve: 'straight' },
         colors: colors,
         fill: { type: 'solid', opacity: colors.map((c, i) => (hasBB && i === 0) ? 0.5 : 1) },
-        markers: { size: 0 },
+        markers: { size: 0, hover: { size: 0, sizeOffset: 0 } },
         legend: { show: false },
         grid: { borderColor: '#f4f4f4' },
         tooltip: {
