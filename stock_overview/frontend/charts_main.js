@@ -68,11 +68,13 @@ function renderMainChart(selector, stock) {
             zoom: { enabled: false },
             animations: { enabled: false }
         },
-        xaxis: { 
-            type: 'category', 
-            labels: { show: false }, 
-            axisBorder: { show: false }, 
-            axisTicks: { show: false } 
+        xaxis: {
+            type: 'category',
+            labels: { show: false },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
+            tooltip: { enabled: true, formatter: function(v) { try { return (typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v; } catch (e) { return v; } } }
         },
         yaxis: { 
             min: yMin, 
@@ -114,7 +116,19 @@ function renderMainChart(selector, stock) {
                 }
             ] : []
         },
-        tooltip: { enabled: false }
+        tooltip: {
+            enabled: true, shared: false, intersect: false, followCursor: true,
+            custom: function({ dataPointIndex }) {
+                try {
+                    const d = stock.dates[dataPointIndex];
+                    const kst = (typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d;
+                    const o = stock.ohlc[dataPointIndex];
+                    const c = o ? o.c : '';
+                    return '<div style="padding:5px 9px;font-size:11px;font-weight:700;">' + kst +
+                           '<br><span style="color:#666;font-weight:600;">종가 ' + c + '</span></div>';
+                } catch (e) { return ''; }
+            }
+        }
     };
 
     const container = document.querySelector(selector);
