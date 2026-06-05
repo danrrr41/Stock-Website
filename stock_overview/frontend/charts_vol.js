@@ -29,8 +29,10 @@ function renderVolChart(selector, stock) {
                     const d = stock.dates[dataPointIndex];
                     const kst = (typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d;
                     const v = stock.volume[dataPointIndex];
+                    const v20 = stock.vol_ma20[dataPointIndex];
+                    const ratio = (v20 > 0 && isFinite(v)) ? (v / v20).toFixed(2) : null;
                     return '<div style="padding:4px 8px;font-size:11px;font-weight:700;">' + kst +
-                        '<br><span style="color:#666;font-weight:600;">거래량 ' + (v != null ? Number(v).toLocaleString('en-US') : '-') + '</span></div>';
+                        '<br><span style="color:#666;font-weight:600;">거래량 ' + (ratio != null ? ratio + '× <span style="color:#aaa;font-weight:400;">(20일평균=1)</span>' : '-') + '</span></div>';
                 } catch (e) { return ''; }
             }
         },

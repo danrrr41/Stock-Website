@@ -241,11 +241,11 @@ function renderChart(sel, fu) {
         series,
         chart: { height: 220, type: 'line', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false } },
         xaxis: {
-            type: 'category', categories: dates, tickAmount: 6,
-            labels: { rotate: 0, hideOverlappingLabels: true, style: { fontSize: '10px', colors: '#999' }, formatter: v => (v ? String(v).slice(2) : '') },
-            axisTicks: { show: false },
+            type: 'category', categories: dates,
+            labels: { show: false },
+            axisTicks: { show: false }, axisBorder: { show: false },
             crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
-            tooltip: { enabled: true }
+            tooltip: { enabled: false }
         },
         yaxis: { labels: { style: { fontSize: '10px', colors: '#999' }, formatter: v => (v != null ? v.toFixed(0) : '') } },
         stroke: { width: widths, dashArray: dashes, curve: 'straight' },
