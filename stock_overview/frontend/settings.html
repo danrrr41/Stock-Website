@@ -58,6 +58,11 @@
     </div>
 
     <script>
+        // 인증 가드
+        if (sessionStorage.getItem('site_auth') !== 'true' || !sessionStorage.getItem('user_id')) {
+            location.href = '/';
+        }
+        const UID = sessionStorage.getItem('user_id') || '';
         const urlParams = new URLSearchParams(window.location.search);
         const listType = urlParams.get('list_type') || 'bookmark';
         
@@ -69,7 +74,7 @@
         // 현재 티커 목록 불러오기
         async function loadTickers() {
             try {
-                const response = await fetch(`/api/settings/tickers?list_type=${listType}`);
+                const response = await fetch(`/api/settings/tickers?list_type=${listType}&uid=${UID}`);
                 const data = await response.json();
                 document.getElementById('ticker-input').value = data.tickers.split(',').map(t => t.trim()).join('\n');
             } catch (e) {
@@ -83,7 +88,7 @@
                 const response = await fetch('/api/settings/tickers', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tickers: content, list_type: listType })
+                    body: JSON.stringify({ tickers: content, list_type: listType, uid: UID })
                 });
                 if (response.ok) {
                     window.location.href = listType === 'mdd' ? '/mdd' : '/';

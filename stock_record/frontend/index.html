@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Record</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        // 인증 가드
+        if (sessionStorage.getItem('site_auth') !== 'true' || !sessionStorage.getItem('user_id')) {
+            location.href = '/';
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        .site-nav { position: relative; display: inline-block; }
+        .site-nav-btn {
+            background: none; border: none; font-size: 2rem; font-weight: 700;
+            cursor: pointer; padding: 0; display: flex; align-items: center; gap: 5px;
+            color: #111; font-family: 'Inter', 'Malgun Gothic', sans-serif;
+        }
+        .site-dropdown { display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 2000; min-width: 220px; padding: 8px; margin-top: 10px; }
+        .site-dropdown a { display: block; padding: 12px 16px; text-decoration: none; color: #444; font-weight: 600; border-radius: 8px; font-size: 0.95rem; }
+        .site-dropdown a:hover { background: #f5f5f7; }
+        .site-dropdown a.active { color: #111; background: #f0f0f0; }
+
+        .toolbar-btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-dark { background: #111; color: #fff; }
+        .btn-light { background: #fff; color: #444; border: 1px solid #ddd; }
+
+        /* 포지션 카드 보강 */
+        .rec-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .rec-actions { display: flex; gap: 6px; }
+        .rec-actions button { border: none; background: #f2f2f2; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #555; }
+        .rec-actions button:hover { background: #e6e6e6; }
+        .rec-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 14px 0; }
+        .rec-metric { background: #f9f9f9; border-radius: 8px; padding: 8px 10px; }
+        .rec-metric .lbl { font-size: 0.62rem; color: #999; text-transform: uppercase; font-weight: 700; }
+        .rec-metric .val { font-size: 1.05rem; font-weight: 800; margin-top: 2px; }
+        .rec-buyinfo { font-size: 0.78rem; color: #86868b; margin-top: 2px; }
+        .rec-memo { font-size: 0.8rem; color: #555; margin-top: 6px; min-height: 1em; }
+
+        /* 모달 */
+        #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 5000; }
+        .modal-box { background: #fff; border-radius: 16px; padding: 30px; width: 360px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .modal-box h3 { margin: 0 0 18px; font-weight: 800; }
+        .modal-box label { display: block; font-size: 0.78rem; font-weight: 700; color: #666; margin: 12px 0 4px; }
+        .modal-box input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="site-nav">
+                <button class="site-nav-btn" onclick="toggleSiteDropdown()">📝 Stock Record</button>
+                <div id="site-dropdown" class="site-dropdown">
+                    <a href="/stock">📈 Stock Overview Pro</a>
+                    <a href="/mdd">📊 MDD Calculator Pro</a>
+                    <a href="/record" class="active">📝 Stock Record</a>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="toolbar-btn btn-light" onclick="location.href='/record/ledger'">📒 매매 기록</button>
+                <button class="toolbar-btn btn-dark" onclick="openAddModal()">＋ 매매 기록 추가</button>
+            </div>
+        </div>
+        <div id="record-grid" class="stock-grid">
+            <div class="loading">기록 로딩 중...</div>
+        </div>
+    </div>
+
+    <!-- 추가/수정 모달 -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <h3 id="modal-title">매매 기록 추가</h3>
+            <label>구분</label>
+            <select id="f-type" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+                <option value="buy">매수</option>
+                <option value="sell">매도</option>
+            </select>
+            <label>종목 (Ticker)</label>
+            <input id="f-ticker" placeholder="AAPL" style="text-transform: uppercase;">
+            <label>날짜 <span style="font-weight:400; color:#aaa; font-size:0.7rem;">(미국 장 기준 · 한국 새벽이면 전날)</span></label>
+            <input id="f-date" type="date">
+            <label>단가</label>
+            <input id="f-price" type="number" step="any" placeholder="190.50">
+            <label>수량 (주)</label>
+            <input id="f-qty" type="number" step="any" placeholder="10">
+            <label>수수료 (선택)</label>
+            <input id="f-fee" type="number" step="any" placeholder="0">
+            <label>메모 (선택)</label>
+            <input id="f-memo" placeholder="">
+            <div class="modal-actions">
+                <button class="toolbar-btn btn-light" onclick="closeModal()">취소</button>
+                <button class="toolbar-btn btn-dark" onclick="submitTx()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="error-popup">
+        <div class="error-icon">!</div>
+        <div id="error-message">문제가 발생했습니다.</div>
+    </div>
+    <div id="toast"></div>
+
+    <script src="/record-static/record.js"></script>
+    <script>
+        function toggleSiteDropdown() {
+            const d = document.getElementById('site-dropdown');
+            d.style.display = d.style.display === 'block' ? 'none' : 'block';
+        }
+        window.onclick = function(event) {
+            if (!event.target.closest('.site-nav')) {
+                document.getElementById('site-dropdown').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

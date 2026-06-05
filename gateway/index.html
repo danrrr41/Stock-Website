@@ -66,22 +66,36 @@
     </div>
 
     <script>
-        const SITE_PASSWORD_SECRET = "0603";
+        function showError() {
+            document.getElementById('pw-error').style.display = 'block';
+            document.getElementById('site-pw').value = '';
+            document.getElementById('site-pw').focus();
+        }
 
-        function checkPassword() {
+        // 서버 검증 로그인: 비밀번호 = 사용자 ID(uid)
+        async function checkPassword() {
             const pw = document.getElementById('site-pw').value;
-            if (pw === SITE_PASSWORD_SECRET) {
-                sessionStorage.setItem('site_auth', 'true');
-                location.href = '/stock'; // Redirect to main dashboard
-            } else {
-                document.getElementById('pw-error').style.display = 'block';
-                document.getElementById('site-pw').value = '';
-                document.getElementById('site-pw').focus();
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pw })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    sessionStorage.setItem('site_auth', 'true');
+                    sessionStorage.setItem('user_id', data.uid);
+                    location.href = '/stock';
+                } else {
+                    showError();
+                }
+            } catch (e) {
+                showError();
             }
         }
 
-        // Already authenticated? Skip gateway.
-        if (sessionStorage.getItem('site_auth') === 'true') {
+        // 이미 인증됨? 게이트웨이 건너뜀.
+        if (sessionStorage.getItem('site_auth') === 'true' && sessionStorage.getItem('user_id')) {
             location.href = '/stock';
         }
     </script>

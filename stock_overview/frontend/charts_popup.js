@@ -4,7 +4,7 @@ function showIndicatorPopup(type, index, event) {
     // 기존에 열려있는 모든 팝업 닫기
     closeAllIndicatorPopups();
 
-    const stock = getSortedData(currentStocksData)[index];
+    const stock = (window.lastRenderedStocks || getSortedData(currentStocksData))[index];
     const popup = document.getElementById(`indicator-popup-${index}`);
     const chartContainer = document.getElementById(`popup-chart-${index}`);
     const title = popup.querySelector('.indicator-popup-title');

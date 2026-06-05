@@ -6,8 +6,8 @@
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        // 인증 체크: 세션 인증이 없으면 대문으로 리다이렉트
-        if (sessionStorage.getItem('site_auth') !== 'true') {
+        // 인증 체크: 세션 인증/사용자ID가 없으면 대문으로 리다이렉트
+        if (sessionStorage.getItem('site_auth') !== 'true' || !sessionStorage.getItem('user_id')) {
             location.href = '/';
         }
     </script>
@@ -47,13 +47,14 @@
                 <div id="site-dropdown" class="site-dropdown text-left">
                     <a href="/stock">📈 Stock Overview Pro</a>
                     <a href="/mdd" class="active">📊 MDD Calculator Pro</a>
+                    <a href="/record">📝 Stock Record</a>
                 </div>
             </div>
             <div class="flex items-center gap-4 bg-gray-50 border rounded-xl px-4 py-2">
                 <div class="flex items-center gap-2 relative">
                     <span class="text-xs font-bold text-gray-500">종목 :</span>
                     <div class="relative flex items-center bg-white border rounded overflow-visible">
-                        <input id="code" type="text" value="NFLX" onkeydown="if(event.key==='Enter') calculate()" class="w-24 px-2 py-1 text-sm uppercase font-bold text-center outline-none">
+                        <input id="code" type="text" value="" onkeydown="if(event.key==='Enter') calculate()" class="w-24 px-2 py-1 text-sm uppercase font-bold text-center outline-none">
                         <button onclick="toggleFavMenu()" class="bg-gray-100 border-l px-2 py-1 text-xs hover:bg-gray-200">▼</button>
                         <div id="fav-menu">
                             <!-- Dynamically loaded -->
@@ -80,7 +81,7 @@
                 <input id="threshold" type="number" value="80" step="5" onchange="calculate()" onkeydown="if(event.key==='Enter') calculate()" class="w-16 border rounded px-2 py-1 font-bold text-blue-600 text-center">
                 <span class="text-xs font-bold text-gray-500">%</span>
             </div>
-            <button onclick="location.href='/settings?list_type=mdd'" class="bg-gray-800 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition">종목 수정</button>
+            <button onclick="location.href='/settings?list_type=bookmark'" class="bg-gray-800 text-white px-5 py-2 rounded-lg font-bold hover:bg-black transition">종목 수정</button>
             <button onclick="calculate()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">적용</button>
         </div>
     </nav>
@@ -124,14 +125,18 @@
         let chart = null;
         let oldPositions = null;
 
+        const UID = sessionStorage.getItem('user_id') || '';
         async function loadMddTickers() {
             try {
-                const res = await fetch('/api/settings/tickers?list_type=mdd');
+                const res = await fetch(`/api/settings/tickers?list_type=bookmark&uid=${UID}`);
                 const data = await res.json();
-                const tickers = data.tickers.split(',').map(t => t.trim());
-                document.getElementById('fav-menu').innerHTML = tickers.map(t => 
+                const tickers = data.tickers.split(',').map(t => t.trim()).filter(Boolean);
+                document.getElementById('fav-menu').innerHTML = tickers.map(t =>
                     `<button onclick="setSymbol('${t}')">${t}</button>`
                 ).join('');
+                // 기본 시작 종목 = 즐겨찾기 맨 위 종목
+                const codeEl = document.getElementById('code');
+                if (!codeEl.value && tickers.length) codeEl.value = tickers[0];
             } catch (e) { console.error(e); }
         }
 
@@ -230,7 +235,7 @@
                 if (siteDropdown) siteDropdown.style.display = 'none';
             }
         };
-        window.onload = () => { toggleEndDate(); loadMddTickers(); calculate(); };
+        window.onload = async () => { toggleEndDate(); await loadMddTickers(); if (document.getElementById('code').value) calculate(); };
     </script>
 </body>
 </html>

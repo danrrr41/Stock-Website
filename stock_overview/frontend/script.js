@@ -2,6 +2,15 @@
 let currentStocksData = [];
 const templates = { header: '', charts: '', indicators: '' };
 
+function getUid() { return sessionStorage.getItem('user_id') || ''; }
+
+// 미국 거래일(yfinance) → 한국시간(KST) 표시일(+1일)
+function toKstDateStr(usDateStr) {
+    const d = new Date(usDateStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().split('T')[0];
+}
+
 function showError(message) {
     const popup = document.getElementById('error-popup');
     const msgBox = document.getElementById('error-message');
@@ -73,12 +82,40 @@ function copyAiRawData(ticker) {
             if (pP >= pM && cP < cM) { dmiCross = "Dead_Cross"; break; }
         }
 
+        // 기준 시각(KST) 및 미국장 개장 여부 → 오늘 봉이 장중 잠정치인지 판별
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const asOf = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        const lastDateKst = stock.dates.length ? toKstDateStr(stock.dates[stock.dates.length - 1]) : '';
+        let marketOpen = false, etStr = '', sessionPct = null, elapsedStr = '';
+        try {
+            const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            etStr = `${et.getFullYear()}-${pad(et.getMonth() + 1)}-${pad(et.getDate())} ${pad(et.getHours())}:${pad(et.getMinutes())}`;
+            const d = et.getDay(), m = et.getHours() * 60 + et.getMinutes();
+            marketOpen = (d >= 1 && d <= 5) && m >= 570 && m < 960; // 평일 09:30~16:00 ET
+            if (marketOpen) {
+                const elapsed = m - 570;                  // 09:30 ET 이후 경과(분), 정규장 390분
+                sessionPct = Math.round(elapsed / 390 * 100);
+                elapsedStr = `${Math.floor(elapsed / 60)}h${pad(elapsed % 60)}m/6h30m`;
+            }
+        } catch (e) {}
+        const isPartial = marketOpen && (lastDateKst === todayStr);
+
         // 2. 텍스트 가공
         let md = `[Stock Overview Pro - AI Technical Analysis Raw Data]\n`;
         md += `Ticker: ${stock.ticker} (${stock.name})\n`;
+        md += `Data_As_Of: ${asOf} KST\n`;
+        md += `US_Eastern_Time: ${etStr} ET\n`;
+        md += `US_Market: ${marketOpen ? `OPEN (장 시작 후 ${elapsedStr}, ${sessionPct}% 경과)` : 'CLOSED'}\n`;
         md += `Current_Price: ${stock.current_price.toFixed(2)} (Currency: ${stock.currency_symbol})\n`;
         md += `Daily_Change_Pct: ${stock.change_pct.toFixed(2)}%\n`;
-        md += `60B_Total_Change_Pct: ${stock.total_change_pct.toFixed(2)}%\n\n`;
+        md += `60B_Total_Change_Pct: ${stock.total_change_pct.toFixed(2)}%\n`;
+        if (isPartial) {
+            const inv = sessionPct > 0 ? (100 / sessionPct).toFixed(2) : '?';
+            md += `Note: 마지막 행(${lastDateKst}, LIVE)은 오늘 미국장 진행 중(${sessionPct}% 경과) 데이터입니다. 거래량/종가는 장중 누적·잠정치라 거래량이 낮게 보입니다. 하루 전체 환산 거래량 ≈ 현재거래량 × ${inv} (선형 가정, 참고용).\n`;
+        }
+        md += `\n`;
 
         md += `■ [Snapshot Indicators]\n`;
         md += `- RSI: ${stock.rsi_val.toFixed(2)}\n`;
@@ -105,7 +142,8 @@ function copyAiRawData(ticker) {
         const count = 20;
         const startIdx = Math.max(0, stock.dates.length - count);
         for (let i = startIdx; i < stock.dates.length; i++) {
-            const date = stock.dates[i];
+            let date = toKstDateStr(stock.dates[i]);  // KST 표시
+            if (isPartial && i === stock.dates.length - 1) date += ' (LIVE/장중)';
             const close = stock.ohlc[i].c;
             const ma20 = stock.ma20[i];
             const ma60 = stock.ma60[i];
@@ -119,8 +157,8 @@ function copyAiRawData(ticker) {
             const pb = stock.pb_list[i];
             const sHist = stock.macd_hist[i] * autoWeight;
             const vol = stock.volume[i];
-            const v20 = stock.vol_ma20[i] || 1;
-            const vRatio = (vol / v20).toFixed(2);
+            const v20 = stock.vol_ma20[i];
+            const vRatio = (v20 > 0 && isFinite(vol)) ? (vol / v20).toFixed(2) : 'N/A';
 
             md += `| ${date} | ${close} | ${ma20} | ${ma60} | ${bbu} | ${bbl} | ${rsi} | ${mfi} | ${adx} | ${dip} | ${dim} | ${pb} | ${sHist.toFixed(2)} | ${vRatio} |\n`;
         }
@@ -154,13 +192,29 @@ async function fetchStockData(listType = 'bookmark') {
     try {
         const grid = document.getElementById('stock-grid');
         grid.innerHTML = `<div class="loading">${listType === 'nasdaq100' ? '나스닥 100 분석 중...' : '로딩 중...'}</div>`;
-        const response = await fetch(`/api/stocks?list_type=${listType}&t=${new Date().getTime()}`);
+        const response = await fetch(`/api/stocks?list_type=${listType}&uid=${getUid()}&t=${new Date().getTime()}`);
         if (!response.ok) throw new Error('서버 응답 오류');
         currentStocksData = await response.json();
         renderStockCards(currentStocksData);
     } catch (error) {
         showError('데이터 로드 실패: ' + error.message);
         document.getElementById('stock-grid').innerHTML = `<div class="loading">연결 오류</div>`;
+    }
+}
+
+// 티커 클릭: 해당 종목만 최신(오늘 현재)으로 재계산 → 화면 갱신 → 복사
+async function refreshAndCopy(ticker) {
+    showToast(`🔄 ${ticker} 최신 데이터 불러오는 중...`);
+    try {
+        const res = await fetch(`/api/stocks/refresh?ticker=${encodeURIComponent(ticker)}&uid=${getUid()}`);
+        if (!res.ok) throw new Error('새로고침 실패');
+        const fresh = await res.json();
+        const idx = currentStocksData.findIndex(s => s.ticker === ticker);
+        if (idx >= 0) currentStocksData[idx] = fresh;
+        renderStockCards(currentStocksData);   // 화면 지표/가격/차트 갱신
+        copyAiRawData(ticker);                  // 갱신된 값 복사
+    } catch (e) {
+        showError('새로고침 실패: ' + e.message);
     }
 }
 
@@ -242,11 +296,64 @@ function getSortedData(data) {
     });
 }
 
+// ===== 기술적 필터 (매수 후보 찾기) =====
+function _recentCrossUp(arr1, arr2, days) {
+    // 최근 days일 내 '가장 최근' 교차가 골든(arr1이 arr2 상향돌파)이면 true.
+    // 골든 후 다시 데드로 반전된 경우는 false (현재 상태가 약세이므로).
+    if (!arr1 || !arr2) return false;
+    const n = Math.min(arr1.length, arr2.length);
+    for (let i = n - 1; i >= Math.max(1, n - (days || 5)); i--) {
+        const p1 = arr1[i - 1], p2 = arr2[i - 1], c1 = arr1[i], c2 = arr2[i];
+        if (p1 == null || p2 == null || c1 == null || c2 == null) continue;
+        if (p1 <= p2 && c1 > c2) return true;   // 최근 교차가 골든 → 채택
+        if (p1 >= p2 && c1 < c2) return false;  // 최근 교차가 데드 → 반전됨, 제외
+    }
+    return false;  // 윈도우 내 교차 없음
+}
+function maGoldenCross(s) { return _recentCrossUp(s.ma20, s.ma60); }
+function diGoldenCross(s) { return _recentCrossUp(s.di_plus_list, s.di_minus_list); }
+function macdGoldenCross(s) { return _recentCrossUp(s.macd, s.macd_signal); }
+
+function readFilters() {
+    const g = id => document.getElementById(id);
+    const num = (cbId, valId) => (g(cbId) && g(cbId).checked) ? parseFloat(g(valId).value) : null;
+    return {
+        maGc: !!(g('f-ma-gc') && g('f-ma-gc').checked),
+        diGc: !!(g('f-di-gc') && g('f-di-gc').checked),
+        macdGc: !!(g('f-macd-gc') && g('f-macd-gc').checked),
+        rsi: num('f-rsi', 'f-rsi-val'),
+        mfi: num('f-mfi', 'f-mfi-val'),
+        pb: num('f-pb', 'f-pb-val'),
+        adx: num('f-adx', 'f-adx-val'),
+    };
+}
+function applyFilters(data) {
+    const f = readFilters();
+    return data.filter(s => {
+        if (f.maGc && !maGoldenCross(s)) return false;
+        if (f.diGc && !diGoldenCross(s)) return false;
+        if (f.macdGc && !macdGoldenCross(s)) return false;
+        if (f.rsi != null && !isNaN(f.rsi) && !(s.rsi_val < f.rsi)) return false;
+        if (f.mfi != null && !isNaN(f.mfi) && !(s.mfi_val < f.mfi)) return false;
+        if (f.pb != null && !isNaN(f.pb) && !(s.pb_val < f.pb)) return false;
+        if (f.adx != null && !isNaN(f.adx) && !(s.adx_val > f.adx)) return false;
+        return true;
+    });
+}
+
 function renderStockCards(stocks) {
     const grid = document.getElementById('stock-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    const sorted = getSortedData(stocks);
+    const filtered = applyFilters(stocks);
+    const fc = document.getElementById('filter-count');
+    if (fc) fc.innerText = filtered.length;
+    if (!filtered.length) {
+        grid.innerHTML = `<div class="loading">조건에 맞는 종목이 없습니다.</div>`;
+        return;
+    }
+    const sorted = getSortedData(filtered);
+    window.lastRenderedStocks = sorted;  // 팝업이 카드와 동일한(필터+정렬) 목록을 참조하도록
 
     sorted.forEach((stock, index) => {
         const card = document.createElement('div');
