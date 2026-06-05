@@ -75,7 +75,9 @@ async def get_stocks(list_type: Optional[str] = "bookmark", uid: Optional[str] =
     if list_type == "bookmark":
         stock_service.update_all_stocks(list_type="bookmark", uid=uid)
         return stock_service.get_stock_data(list_type, uid, realtime=False)
-    return stock_service.get_stock_data(list_type, uid)
+    # 나스닥100 등 대량 목록: Vercel에서 100종목 실시간 벌크가 느려(~46s) 캐시값 즉시 반환.
+    # 개별 종목 실시간은 티커 클릭(/api/stocks/refresh)으로.
+    return stock_service.get_stock_data(list_type, uid, realtime=False)
 
 
 @app.get("/api/stocks/refresh")
