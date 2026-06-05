@@ -6,6 +6,23 @@ let popupCharts = {};    // key -> 현재 열린 팝업 ApexCharts 인스턴스
 function getUid() { return sessionStorage.getItem('user_id') || ''; }
 function safeKey(ticker) { return String(ticker).replace(/[^A-Za-z0-9]/g, '_'); }
 
+// ===== 차트 표시 옵션 (이평선 / 볼린저밴드 토글) — Stock Overview와 동일 키 공유 =====
+const CHART_OPTS_KEY = 'chartOpts';
+const CHART_OPTS_DEFAULT = { bb: true, ma5: false, ma20: true, ma60: true, ma120: false };
+function getChartOpts() {
+    try { return Object.assign({}, CHART_OPTS_DEFAULT, JSON.parse(localStorage.getItem(CHART_OPTS_KEY) || '{}')); }
+    catch (e) { return Object.assign({}, CHART_OPTS_DEFAULT); }
+}
+function setChartOpt(k, v) {
+    const o = getChartOpts(); o[k] = v;
+    try { localStorage.setItem(CHART_OPTS_KEY, JSON.stringify(o)); } catch (e) {}
+}
+function rerenderAllCharts() {
+    Object.keys(fuCache).forEach(key => {
+        if (document.querySelector(`#chart-${key}`)) renderChart(`#chart-${key}`, fuCache[key]);
+    });
+}
+
 function showError(message) {
     const popup = document.getElementById('error-popup');
     const msgBox = document.getElementById('error-message');
@@ -212,9 +229,11 @@ function showFollowupPopup(type, key, event) {
 
 function renderChart(sel, fu) {
     // 영업일(category) 축 → 주말/휴일 빈칸 없음. 선(가격 + MA + BB).
+    const opts = (typeof getChartOpts === 'function') ? getChartOpts() : { bb: true, ma5: false, ma20: true, ma60: true, ma120: false };
     const dates = fu.dates || [];
     const close = (fu.ohlc || []).map(d => d.c);
-    const hasBB = (fu.bb_upper && fu.bb_upper.length === dates.length && fu.bb_lower && fu.bb_lower.length === dates.length);
+    const hasBB = opts.bb && (fu.bb_upper && fu.bb_upper.length === dates.length && fu.bb_lower && fu.bb_lower.length === dates.length);
+    const D = (arr) => dates.map((d, i) => ({ x: d, y: (arr || [])[i] }));
 
     const series = [];
     const colors = [];
@@ -226,10 +245,22 @@ function renderChart(sel, fu) {
     }
     series.push({ name: '가격', type: 'line', data: dates.map((d, i) => ({ x: d, y: close[i] })) });
     colors.push('#111'); widths.push(2.5); dashes.push(0);
-    series.push({ name: '20MA', type: 'line', data: dates.map((d, i) => ({ x: d, y: (fu.ma20 || [])[i] })) });
-    colors.push('#27ae60'); widths.push(1.5); dashes.push(0);
-    series.push({ name: '60MA', type: 'line', data: dates.map((d, i) => ({ x: d, y: (fu.ma60 || [])[i] })) });
-    colors.push('#f1c40f'); widths.push(1.5); dashes.push(0);
+    if (opts.ma5 && fu.ma5 && fu.ma5.length) {
+        series.push({ name: '5MA', type: 'line', data: D(fu.ma5) });
+        colors.push('#9b59b6'); widths.push(1.5); dashes.push(0);
+    }
+    if (opts.ma20) {
+        series.push({ name: '20MA', type: 'line', data: D(fu.ma20) });
+        colors.push('#27ae60'); widths.push(1.5); dashes.push(0);
+    }
+    if (opts.ma60) {
+        series.push({ name: '60MA', type: 'line', data: D(fu.ma60) });
+        colors.push('#f1c40f'); widths.push(1.5); dashes.push(0);
+    }
+    if (opts.ma120 && fu.ma120 && fu.ma120.length) {
+        series.push({ name: '120MA', type: 'line', data: D(fu.ma120) });
+        colors.push('#e67e22'); widths.push(1.5); dashes.push(0);
+    }
     if (hasBB) {
         series.push({ name: 'BB상', type: 'line', data: dates.map((d, i) => ({ x: d, y: fu.bb_upper[i] })) });
         colors.push('#ff3b30'); widths.push(2); dashes.push(6);

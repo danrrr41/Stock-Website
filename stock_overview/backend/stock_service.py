@@ -79,9 +79,11 @@ def calculate_indicators(df):
     bb = df.ta.bbands(length=20, std=2)
     if bb is not None: df = pd.concat([df, bb], axis=1)
     
+    df['ma5'] = df['close'].rolling(window=5).mean()
     df['ma20'] = df.ta.sma(length=20)
     df['ma60'] = df.ta.sma(length=60)
-    
+    df['ma120'] = df['close'].rolling(window=120).mean()
+
     df['vol_ma5'] = df['volume'].rolling(window=5).mean()
     df['vol_ma20'] = df['volume'].rolling(window=20).mean()
     
@@ -126,8 +128,10 @@ def generate_stock_json(orig_ticker, norm_ticker, df, name=None):
         "currency_symbol": currency_symbol(norm_ticker),
         **snapshot_indicators(t_df),
         "ohlc": ohlc,
+        "ma5": clean_list(t_df['ma5']) if 'ma5' in t_df else [],
         "ma20": clean_list(t_df['ma20']),
         "ma60": clean_list(t_df['ma60']),
+        "ma120": clean_list(t_df['ma120']) if 'ma120' in t_df else [],
         "bb_upper": clean_list(t_df[bbu_col]) if bbu_col else [0]*60,
         "bb_lower": clean_list(t_df[bbl_col]) if bbl_col else [0]*60,
         "macd": clean_list(t_df[m_col]) if m_col in t_df else [0]*60,

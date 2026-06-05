@@ -1,14 +1,17 @@
 function renderMainChart(selector, stock) {
+    const opts = (typeof getChartOpts === 'function') ? getChartOpts() : { bb: true, ma5: false, ma20: true, ma60: true, ma120: false };
     const startPrice = stock.ohlc[0].c;
     const baseRange = 0.30;
 
-    const allValues = [
-        ...stock.ohlc.map(d => d.c),
-        ...stock.bb_upper,
-        ...stock.bb_lower,
-        ...stock.ma20, ...stock.ma60
-    ].filter(v => v !== null && !isNaN(v));
-    
+    // y축 범위는 실제 표시되는 오버레이만 반영
+    const rangeVals = [...stock.ohlc.map(d => d.c)];
+    if (opts.bb) rangeVals.push(...(stock.bb_upper || []), ...(stock.bb_lower || []));
+    if (opts.ma5) rangeVals.push(...(stock.ma5 || []));
+    if (opts.ma20) rangeVals.push(...(stock.ma20 || []));
+    if (opts.ma60) rangeVals.push(...(stock.ma60 || []));
+    if (opts.ma120) rangeVals.push(...(stock.ma120 || []));
+    const allValues = rangeVals.filter(v => v !== null && v !== undefined && !isNaN(v));
+
     const actualMax = Math.max(...allValues);
     const actualMin = Math.max(0.1, Math.min(...allValues));
 
@@ -42,26 +45,27 @@ function renderMainChart(selector, stock) {
         }
     }
 
+    // ===== 옵션에 따라 동적으로 시리즈 구성 (color/width/dash 정렬 유지) =====
+    const series = [], colors = [], widths = [], dashes = [], fillOp = [];
+    const add = (s, c, w, dash, op) => { series.push(s); colors.push(c); widths.push(w); dashes.push(dash); fillOp.push(op); };
+    const D = (arr) => stock.dates.map((d, i) => ({ x: d, y: (arr || [])[i] }));
+
+    if (opts.bb) add({ name: 'BB Fill', type: 'rangeArea', data: stock.dates.map((d, i) => ({ x: d, y: [stock.bb_lower[i], stock.bb_upper[i]] })) }, '#e1f5fe', 0, 0, 0.6);
+    add({ name: 'Price', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.ohlc[i].c })) }, '#111', 3, 0, 1);
+    if (opts.ma5) add({ name: '5MA', type: 'line', data: D(stock.ma5) }, '#9b59b6', 1.5, 0, 1);
+    if (opts.ma20) add({ name: '20MA', type: 'line', data: D(stock.ma20) }, '#27ae60', 2, 0, 1);
+    if (opts.ma60) add({ name: '60MA', type: 'line', data: D(stock.ma60) }, '#f1c40f', 2, 0, 1);
+    if (opts.ma120) add({ name: '120MA', type: 'line', data: D(stock.ma120) }, '#e67e22', 2, 0, 1);
+    if (opts.bb) {
+        add({ name: 'BB Lower', type: 'line', data: D(stock.bb_lower) }, '#007aff', 2, 6, 1);
+        add({ name: 'BB Upper', type: 'line', data: D(stock.bb_upper) }, '#ff3b30', 2, 6, 1);
+    }
+    add({ name: 'Golden', type: 'scatter', data: stock.dates.map((d, i) => ({ x: d, y: goldenData[i] })) }, '#ff3b30', 0, 0, 1);
+    add({ name: 'Dead', type: 'scatter', data: stock.dates.map((d, i) => ({ x: d, y: deadData[i] })) }, '#007aff', 0, 0, 1);
+
     const options = {
-        series: [
-            {
-                name: 'BB Fill',
-                type: 'rangeArea',
-                data: stock.dates.map((d, i) => ({ x: d, y: [stock.bb_lower[i], stock.bb_upper[i]] }))
-            },
-            {
-                name: 'Price',
-                type: 'line',
-                data: stock.dates.map((d, i) => ({ x: d, y: stock.ohlc[i].c }))
-            },
-            { name: '20MA', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.ma20[i] })) },
-            { name: '60MA', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.ma60[i] })) },
-            { name: 'BB Lower', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.bb_lower[i] })) },
-            { name: 'BB Upper', type: 'line', data: stock.dates.map((d, i) => ({ x: d, y: stock.bb_upper[i] })) },
-            { name: 'Golden', type: 'scatter', data: stock.dates.map((d, i) => ({ x: d, y: goldenData[i] })) },
-            { name: 'Dead', type: 'scatter', data: stock.dates.map((d, i) => ({ x: d, y: deadData[i] })) }
-        ],
-        chart: { 
+        series: series,
+        chart: {
             height: 220, 
             type: 'line', 
             toolbar: { show: false }, 
@@ -85,15 +89,15 @@ function renderMainChart(selector, stock) {
         },
         grid: { show: false },
         legend: { show: false },
-        stroke: { 
-            width: [0, 3, 2, 2, 2, 2, 0, 0], 
+        stroke: {
+            width: widths,
             curve: 'straight',
-            dashArray: [0, 0, 0, 0, 6, 6, 0, 0]
+            dashArray: dashes
         },
-        colors: ['#e1f5fe', '#111', '#27ae60', '#f1c40f', '#007aff', '#ff3b30', '#ff3b30', '#007aff'],
+        colors: colors,
         fill: {
             type: 'solid',
-            opacity: [0.6, 1, 1, 1, 1, 1, 1, 1] 
+            opacity: fillOp
         },
         markers: {
             size: 0,

@@ -48,6 +48,11 @@
         .modal-box label { display: block; font-size: 0.78rem; font-weight: 700; color: #666; margin: 12px 0 4px; }
         .modal-box input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+        .chartset-wrap { position: relative; }
+        .chartset-panel { display:none; position:absolute; top:100%; right:0; margin-top:8px; background:white; border:1px solid #e5e5e5; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.12); padding:14px; z-index:2000; min-width:200px; text-align:left; }
+        .filt-row { display:flex; align-items:center; gap:6px; padding:5px 0; font-size:0.85rem; font-weight:600; cursor:pointer; }
+        .filt-hint { color:#aaa; font-weight:400; font-size:0.72rem; }
     </style>
 </head>
 <body>
@@ -62,6 +67,17 @@
                 </div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
+                <div class="chartset-wrap">
+                    <button class="toolbar-btn btn-light" onclick="toggleChartSet()">차트 설정</button>
+                    <div id="chartset-panel" class="chartset-panel">
+                        <div style="font-weight:700; margin-bottom:8px; font-size:0.9rem;">차트 표시</div>
+                        <label class="filt-row"><input type="checkbox" id="cs-bb" onchange="onChartSetChange()"> 볼린저밴드 <span class="filt-hint">빨강·파랑·음영</span></label>
+                        <label class="filt-row"><input type="checkbox" id="cs-ma5" onchange="onChartSetChange()"> 5일선</label>
+                        <label class="filt-row"><input type="checkbox" id="cs-ma20" onchange="onChartSetChange()"> 20일선</label>
+                        <label class="filt-row"><input type="checkbox" id="cs-ma60" onchange="onChartSetChange()"> 60일선</label>
+                        <label class="filt-row"><input type="checkbox" id="cs-ma120" onchange="onChartSetChange()"> 120일선</label>
+                    </div>
+                </div>
                 <button class="toolbar-btn btn-light" onclick="location.href='/record/ledger'">📒 매매 기록</button>
                 <button class="toolbar-btn btn-dark" onclick="openAddModal()">＋ 매매 기록 추가</button>
             </div>
@@ -105,7 +121,7 @@
     </div>
     <div id="toast"></div>
 
-    <script src="/record-static/record.js?v=1.6"></script>
+    <script src="/record-static/record.js?v=1.7"></script>
     <script>
         function toggleSiteDropdown() {
             const d = document.getElementById('site-dropdown');
@@ -115,7 +131,30 @@
             if (!event.target.closest('.site-nav')) {
                 document.getElementById('site-dropdown').style.display = 'none';
             }
+            if (!event.target.closest('.chartset-wrap')) {
+                const cp = document.getElementById('chartset-panel');
+                if (cp) cp.style.display = 'none';
+            }
         }
+        function toggleChartSet() {
+            const p = document.getElementById('chartset-panel');
+            p.style.display = p.style.display === 'block' ? 'none' : 'block';
+        }
+        function initChartSet() {
+            const o = getChartOpts();
+            ['bb', 'ma5', 'ma20', 'ma60', 'ma120'].forEach(k => {
+                const el = document.getElementById('cs-' + k);
+                if (el) el.checked = !!o[k];
+            });
+        }
+        function onChartSetChange() {
+            ['bb', 'ma5', 'ma20', 'ma60', 'ma120'].forEach(k => {
+                const el = document.getElementById('cs-' + k);
+                if (el) setChartOpt(k, el.checked);
+            });
+            if (typeof rerenderAllCharts === 'function') rerenderAllCharts();
+        }
+        document.addEventListener('DOMContentLoaded', initChartSet);
     </script>
 </body>
 </html>

@@ -290,8 +290,10 @@ def followup_for_record(rec: dict) -> dict:
         "days_held": days_held,
         "dates": (chart_df.index + pd.Timedelta(days=1)).strftime("%Y-%m-%d").tolist(),  # KST 표시일
         "ohlc": ohlc,
+        "ma5": _clean_series(chart_df["ma5"]) if "ma5" in chart_df else [],
         "ma20": _clean_series(chart_df["ma20"]) if "ma20" in chart_df else [],
         "ma60": _clean_series(chart_df["ma60"]) if "ma60" in chart_df else [],
+        "ma120": _clean_series(chart_df["ma120"]) if "ma120" in chart_df else [],
         "bb_upper": _clean_series(chart_df[cols["bbu"]]) if cols["bbu"] in chart_df else [],
         "bb_lower": _clean_series(chart_df[cols["bbl"]]) if cols["bbl"] in chart_df else [],
         # 지표 미니차트용 시계열 (차트와 동일 기간)

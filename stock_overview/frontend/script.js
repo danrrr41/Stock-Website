@@ -4,6 +4,18 @@ const templates = { header: '', charts: '', indicators: '' };
 
 function getUid() { return sessionStorage.getItem('user_id') || ''; }
 
+// ===== 차트 표시 옵션 (이평선 / 볼린저밴드 토글) =====
+const CHART_OPTS_KEY = 'chartOpts';
+const CHART_OPTS_DEFAULT = { bb: true, ma5: false, ma20: true, ma60: true, ma120: false };
+function getChartOpts() {
+    try { return Object.assign({}, CHART_OPTS_DEFAULT, JSON.parse(localStorage.getItem(CHART_OPTS_KEY) || '{}')); }
+    catch (e) { return Object.assign({}, CHART_OPTS_DEFAULT); }
+}
+function setChartOpt(k, v) {
+    const o = getChartOpts(); o[k] = v;
+    try { localStorage.setItem(CHART_OPTS_KEY, JSON.stringify(o)); } catch (e) {}
+}
+
 // 미국 거래일(yfinance) → 한국시간(KST) 표시일(+1일)
 function toKstDateStr(usDateStr) {
     const d = new Date(usDateStr + 'T00:00:00Z');
