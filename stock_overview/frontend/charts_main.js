@@ -25,9 +25,18 @@ function renderMainChart(selector, stock) {
 
     if (isBreakthrough) {
         const maxDev = Math.max(devUpper, devLower);
-        const scaleFactor = maxDev * 1.03; 
+        const scaleFactor = maxDev * 1.03;
         yMax = startPrice * (1 + scaleFactor);
         yMin = Math.max(0.1, startPrice * (1 - scaleFactor));
+    }
+
+    // 복기(Review): 종목 비교가 아니므로 고정 ±30% 대신 데이터에 꽉 맞춰 auto-scale.
+    // (변동 작은 구간이 가운데 납작하게 깔리는 위아래 여백 제거). overview는 위 ±30% 로직 유지.
+    if (stock.entry_us) {
+        const padR = (actualMax - actualMin) * 0.06 || (actualMax * 0.02) || 1;
+        yMax = actualMax + padR;
+        yMin = Math.max(0.1, actualMin - padR);
+        isBreakthrough = false;  // ±30% 가이드선 비활성
     }
 
     const goldenData = new Array(stock.dates.length).fill(null);
@@ -78,16 +87,20 @@ function renderMainChart(selector, stock) {
             axisBorder: { show: false },
             axisTicks: { show: false },
             crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
-            tooltip: { enabled: true, formatter: function(v) { try { return (typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v; } catch (e) { return v; } } }
+            tooltip: { enabled: true, formatter: function(v) { try { return stock.entry_us ? v : ((typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v); } catch (e) { return v; } } }
         },
-        yaxis: { 
-            min: yMin, 
-            max: yMax, 
-            labels: { show: false }, 
-            axisBorder: { show: false }, 
-            axisTicks: { show: false } 
+        yaxis: {
+            show: !stock.entry_us,   // 복기에선 y축 자체를 숨겨 좌측 거터 제거 → 4개 차트 폭 일치
+            min: yMin,
+            max: yMax,
+            labels: { show: false },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
         },
-        grid: { show: false },
+        // 복기에선 4개 차트 플롯 폭을 맞추기 위해 좌우 여백 0 (overview는 기존 기본값).
+        grid: stock.entry_us
+            ? { show: false, padding: { top: 0, bottom: 0, left: 0, right: 0 } }
+            : { show: false },
         legend: { show: false },
         stroke: {
             width: widths,
@@ -126,11 +139,15 @@ function renderMainChart(selector, stock) {
             custom: function({ dataPointIndex }) {
                 try {
                     const d = stock.dates[dataPointIndex];
-                    const kst = (typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d;
+                    const kst = stock.entry_us ? d : ((typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d);
                     const o = stock.ohlc[dataPointIndex];
                     const c = o ? o.c : '';
-                    return '<div style="padding:5px 9px;font-size:11px;font-weight:700;">' + kst +
-                           '<br><span style="color:#666;font-weight:600;">종가 ' + c + '</span></div>';
+                    let html = '<div style="padding:5px 9px;font-size:11px;font-weight:700;">' + kst +
+                               '<br><span style="color:#666;font-weight:600;">종가 ' + c + '</span>';
+                    if (stock.entry_us && o) {   // 복기(Review)에서만 고가/저가 추가
+                        html += '<br><span style="color:#999;font-weight:600;">고가 ' + o.h + ' / 저가 ' + o.l + '</span>';
+                    }
+                    return html + '</div>';
                 } catch (e) { return ''; }
             }
         }

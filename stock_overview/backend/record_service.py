@@ -1,7 +1,7 @@
 """stock_record 시스템 백엔드 로직.
 
-- 보유 포지션 기록(매수만, 미니멀) CRUD + Follow Up 계산
 - 매매 원장(매수/매도) CRUD + 통계
+- 보유 포지션 산출(거래내역 집계) + Follow Up 계산 (매수일 이후 추적)
 
 stock_overview의 데이터 로직(normalize_ticker, calculate_indicators,
 snapshot_indicators, currency_symbol)을 재사용한다.
@@ -36,58 +36,7 @@ def _kst_to_us(date_str: str):
 
 
 # ===========================================================================
-# 1) 보유 포지션 기록 (record:{uid}) — 매수만
-# ===========================================================================
-def list_records(uid: str) -> list:
-    return redis_service.get_records(uid)
-
-
-def add_record(uid: str, ticker: str, buy_date: str, buy_price, quantity, fee=0, memo: str = "") -> dict:
-    records = redis_service.get_records(uid)
-    rec = {
-        "id": _new_id(),
-        "ticker": str(ticker).strip().upper(),
-        "buy_date": buy_date,
-        "buy_price": float(buy_price),
-        "quantity": float(quantity),
-        "fee": float(fee or 0),
-        "memo": memo or "",
-        "created_at": _now(),
-    }
-    records.append(rec)
-    redis_service.save_records(uid, records)
-    return rec
-
-
-def update_record(uid: str, rec_id: str, fields: dict):
-    records = redis_service.get_records(uid)
-    for r in records:
-        if r["id"] == rec_id:
-            for k in ("ticker", "buy_date", "buy_price", "quantity", "fee", "memo"):
-                if k in fields and fields[k] is not None:
-                    if k in ("buy_price", "quantity", "fee"):
-                        r[k] = float(fields[k])
-                    elif k == "ticker":
-                        r[k] = str(fields[k]).strip().upper()
-                    else:
-                        r[k] = fields[k]
-            redis_service.save_records(uid, records)
-            return r
-    return None
-
-
-def delete_record(uid: str, rec_id: str) -> dict:
-    records = redis_service.get_records(uid)
-    target = next((r for r in records if r["id"] == rec_id), None)
-    new_records = [r for r in records if r["id"] != rec_id]
-    redis_service.save_records(uid, new_records)
-    if target:
-        _maybe_cleanup_history(target.get("ticker", ""))
-    return {"deleted": len(records) - len(new_records)}
-
-
-# ===========================================================================
-# 2) Follow Up 계산 — 매수 이후 차트 + 현재 지표 + 수익률/실제 수익
+# 1) Follow Up 계산 — 매수 이후 차트 + 현재 지표 + 수익률/실제 수익
 # ===========================================================================
 def _clean_series(series):
     return series.ffill().bfill().fillna(0).round(2).tolist()
@@ -139,6 +88,7 @@ def _ensure_history(orig: str, norm: str, need_start: str):
     cache = redis_service.get_rec_ohlcv(orig)
     data = cache.get("data") if cache else None
     updated = cache.get("updated") if cache else None
+    earliest = cache.get("earliest") if cache else None  # 백필을 시도해 본 가장 과거 날짜
 
     # 캐시가 없으면: 전역 ohlcv가 충분히 과거를 커버하면 시드로 재사용
     if not data:
@@ -154,16 +104,20 @@ def _ensure_history(orig: str, norm: str, need_start: str):
         df = _download_clean(norm, start=need_start)
         if df is None:
             return None
+        earliest = need_start
         changed = True
     else:
         cmin = df.index.min().strftime("%Y-%m-%d")
         cmax = df.index.max().strftime("%Y-%m-%d")
-        # 과거 백필 (더 오래된 매수일이 들어온 경우)
-        if need_start < cmin:
+        # 과거 백필 (더 오래된 매수일이 들어온 경우).
+        # earliest까지 이미 시도했으면 재시도 안 함 — need_start가 주말/휴일 갭이면
+        # cmin이 거기 못 닿아 매 호출마다 빈 다운로드가 무한 반복됨.
+        if need_start < cmin and (earliest is None or need_start < earliest):
             older = _download_clean(norm, start=need_start, end=cmin)
             if older is not None:
                 df = pd.concat([older, df])
-                changed = True
+            earliest = need_start  # 데이터가 없어도 '여기까지 시도함'으로 기록 → 재시도 차단
+            changed = True
         # 최신 보강 (하루 1회)
         if updated != today:
             newer = _download_clean(norm, start=cmax)
@@ -189,7 +143,7 @@ def _ensure_history(orig: str, norm: str, need_start: str):
 
     df = df[~df.index.duplicated(keep="last")].sort_index()
     if changed:
-        redis_service.save_rec_ohlcv(orig, {"updated": today, "data": _store_df(df)})
+        redis_service.save_rec_ohlcv(orig, {"updated": today, "data": _store_df(df), "earliest": earliest})
     return df
 
 
@@ -308,15 +262,8 @@ def followup_for_record(rec: dict) -> dict:
     return payload
 
 
-def compute_followup(uid: str, rec_id: str):
-    rec = next((r for r in redis_service.get_records(uid) if r["id"] == rec_id), None)
-    if not rec:
-        return None
-    return followup_for_record(rec)
-
-
 # ===========================================================================
-# 3) 매매 원장 (ledger:{uid}) — 매수/매도 전체 + 통계
+# 2) 매매 원장 (ledger:{uid}) — 매수/매도 전체 + 통계
 # ===========================================================================
 def list_ledger(uid: str) -> list:
     return redis_service.get_ledger(uid)
@@ -451,7 +398,7 @@ def ledger_stats(uid: str) -> dict:
 
 
 # ===========================================================================
-# 4) 보유 종목 (거래내역에서 자동 산출) — 매수/매도 통합 모델
+# 3) 보유 종목 (거래내역에서 자동 산출) — 매수/매도 통합 모델
 # ===========================================================================
 def _aggregate_positions(uid: str) -> dict:
     """거래내역(ledger)에서 종목별 보유 수량/평균단가(수수료 포함) 산출."""
@@ -462,12 +409,13 @@ def _aggregate_positions(uid: str) -> dict:
     pos = {}
     for e in txs:
         t = e["ticker"]
-        st = pos.setdefault(t, {"qty": 0.0, "cost": 0.0, "first_buy": None})
+        st = pos.setdefault(t, {"qty": 0.0, "cost": 0.0, "fee": 0.0, "first_buy": None})
         q = float(e["quantity"])
         p = float(e["price"])
         fee = float(e.get("fee", 0) or 0)
         if e.get("type") == "buy":
             st["cost"] += q * p + fee          # 수수료 원가 가산
+            st["fee"] += fee                   # 보유분에 녹아있는 수수료 추적
             st["qty"] += q
             d = e.get("date")
             if d and (st["first_buy"] is None or d < st["first_buy"]):
@@ -476,7 +424,9 @@ def _aggregate_positions(uid: str) -> dict:
             if st["qty"] > 0:
                 avg = st["cost"] / st["qty"]
                 sold = min(q, st["qty"])
+                frac = sold / st["qty"]
                 st["cost"] -= avg * sold
+                st["fee"] *= (1 - frac)        # 수수료도 매도분만큼 비례 차감
                 st["qty"] -= sold
     return pos
 
@@ -491,6 +441,7 @@ def get_positions(uid: str) -> list:
                 "name": redis_service.get_name(t) or t,
                 "quantity": round(st["qty"], 6),
                 "avg_price": round(st["cost"] / st["qty"], 4),  # 수수료 반영 평균단가
+                "fee": round(st["fee"], 4),                     # 보유분에 포함된 수수료
                 "first_buy": st["first_buy"],
             })
     out.sort(key=lambda x: x["ticker"])

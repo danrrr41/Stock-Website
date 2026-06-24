@@ -1,0 +1,21 @@
+Stock Website 변경 기록 (CHANGELOG)
+====================================
+
+[v1.1] 메인 기능 3종 — Stock Overview Pro · MDD Calculator Pro · Stock Record.
+
+[v1.2] 2026-06-24
+- Review(복기) 기능 추가 → 메인 4종 체제.
+  · 임의 종목·날짜로 진입 직전부터 '현재까지'의 차트를 보고, 왜 들어갔는지 한두 줄로 기록.
+  · 매수 시점은 보라색 수직선으로 표시. 카드는 전체 폭 사용.
+  · 수량 + 매매금액(소수점 주식 지원, 예: 0.22주/$100) 입력 시 수익률·평가손익 산출.
+  · Stock Record에서 보유 종목의 티커를 클릭하면 해당 매수 시점으로 바로 연결.
+  · 차트는 Stock Overview의 렌더러를 그대로 재사용(일관된 화면).
+- 정리/리팩터링
+  · 미사용 죽은 코드 삭제: mdd_calculator/api/main.py (하드코딩 비밀번호 포함).
+  · record_service 레거시 record CRUD 제거(ledger 단일 모델로 일원화).
+  · FastAPI startup 이벤트 → lifespan 방식으로 전환, 미사용 import 제거.
+- 운영 로그 오류 정리 (Vercel)
+  · yfinance 타임존 캐시를 /tmp로 지정 → 읽기전용 FS 경고 제거 + 호출 속도 개선.
+  · followup 백필이 비거래일(주말/휴일) 구간에서 매 호출마다 헛돌던 문제 차단
+    (rec_ohlcv 캐시에 'earliest' 마커 추가 → 시도한 과거 구간 재시도 안 함).
+  · /favicon.ico 204 응답 라우트 추가 → catch-all 404 노이즈 제거.

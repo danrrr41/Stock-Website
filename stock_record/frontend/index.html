@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Record</title>
+    <title>Record</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script>
@@ -31,6 +31,8 @@
 
         /* 포지션 카드 보강 */
         .rec-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .rec-review-btn { border: 1px solid #ddd; background: #fff; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 700; font-size: 0.85rem; color: #333; white-space: nowrap; flex-shrink: 0; }
+        .rec-review-btn:hover { background: #f5f5f7; border-color: #ccc; }
         .rec-actions { display: flex; gap: 6px; }
         .rec-actions button { border: none; background: #f2f2f2; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #555; }
         .rec-actions button:hover { background: #e6e6e6; }
@@ -39,6 +41,8 @@
         .rec-metric .lbl { font-size: 0.62rem; color: #999; text-transform: uppercase; font-weight: 700; }
         .rec-metric .val { font-size: 1.05rem; font-weight: 800; margin-top: 2px; }
         .rec-buyinfo { font-size: 0.78rem; color: #86868b; margin-top: 2px; }
+        .rec-review-memo { font-size: 0.82rem; color: #555; margin: 8px 0 2px; padding: 7px 10px; background: #faf7ff; border: 1px solid #ede9fe; border-radius: 8px; line-height: 1.35; }
+        .rec-review-memo .rmemo-empty { color: #bbb; }
         .rec-memo { font-size: 0.8rem; color: #555; margin-top: 6px; min-height: 1em; }
 
         /* 모달 */
@@ -59,11 +63,13 @@
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div class="site-nav">
-                <button class="site-nav-btn" onclick="toggleSiteDropdown()">📝 Stock Record</button>
+                <button class="site-nav-btn" onclick="toggleSiteDropdown()">📝 Record</button>
                 <div id="site-dropdown" class="site-dropdown">
-                    <a href="/stock">📈 Stock Overview Pro</a>
-                    <a href="/mdd">📊 MDD Calculator Pro</a>
-                    <a href="/record" class="active">📝 Stock Record</a>
+                    <a href="/stock">📈 Overview</a>
+                    <a href="/mdd">📊 MDD</a>
+                    <a href="/record" class="active">📝 Record</a>
+                    <a href="/review">🔍 Review</a>
+                    <a href="/log">🧾 Log</a>
                 </div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
@@ -121,7 +127,7 @@
     </div>
     <div id="toast"></div>
 
-    <script src="/record-static/record.js?v=1.7"></script>
+    <script src="/record-static/record.js?v=1.11"></script>
     <script>
         function toggleSiteDropdown() {
             const d = document.getElementById('site-dropdown');

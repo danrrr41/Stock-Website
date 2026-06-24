@@ -38,7 +38,7 @@ function renderMacdChart(selector, stock) {
             custom: function({ dataPointIndex }) {
                 try {
                     const d = stock.dates[dataPointIndex];
-                    const kst = (typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d;
+                    const kst = stock.entry_us ? d : ((typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d);
                     const m = stock.macd[dataPointIndex], s = stock.macd_signal[dataPointIndex];
                     return '<div style="padding:4px 8px;font-size:11px;font-weight:700;">' + kst +
                         '<br><span style="color:#666;font-weight:600;">MACD ' + (m != null ? m.toFixed(2) : '-') +
@@ -52,7 +52,7 @@ function renderMacdChart(selector, stock) {
         xaxis: {
             type: 'category', labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false },
             crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
-            tooltip: { enabled: true, formatter: function(v) { try { return (typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v; } catch (e) { return v; } } }
+            tooltip: { enabled: true, formatter: function(v) { try { return stock.entry_us ? v : ((typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v); } catch (e) { return v; } } }
         },
         yaxis: {
             min: -dynamicMax,

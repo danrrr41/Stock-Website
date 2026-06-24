@@ -27,7 +27,7 @@ function renderVolChart(selector, stock) {
             custom: function({ dataPointIndex }) {
                 try {
                     const d = stock.dates[dataPointIndex];
-                    const kst = (typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d;
+                    const kst = stock.entry_us ? d : ((typeof toKstDateStr === 'function' && d) ? toKstDateStr(d) : d);
                     const v = stock.volume[dataPointIndex];
                     const v20 = stock.vol_ma20[dataPointIndex];
                     const ratio = (v20 > 0 && isFinite(v)) ? (v / v20).toFixed(2) : null;
@@ -46,7 +46,7 @@ function renderVolChart(selector, stock) {
         xaxis: {
             type: 'category', labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false },
             crosshairs: { show: true, stroke: { color: '#94a3b8', width: 1, dashArray: 3 } },
-            tooltip: { enabled: true, formatter: function(v) { try { return (typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v; } catch (e) { return v; } } }
+            tooltip: { enabled: true, formatter: function(v) { try { return stock.entry_us ? v : ((typeof toKstDateStr === 'function' && v) ? toKstDateStr(v) : v); } catch (e) { return v; } } }
         },
         yaxis: {
             min: 0,

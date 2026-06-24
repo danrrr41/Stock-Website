@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        // 인증 가드
+        if (sessionStorage.getItem('site_auth') !== 'true' || !sessionStorage.getItem('user_id')) {
+            location.href = '/';
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        .site-nav { position: relative; display: inline-block; }
+        .site-nav-btn {
+            background: none; border: none; font-size: 2rem; font-weight: 700;
+            cursor: pointer; padding: 0; display: flex; align-items: center; gap: 5px;
+            color: #111; font-family: 'Inter', 'Malgun Gothic', sans-serif;
+        }
+        .site-dropdown { display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 2000; min-width: 220px; padding: 8px; margin-top: 10px; }
+        .site-dropdown a { display: block; padding: 12px 16px; text-decoration: none; color: #444; font-weight: 600; border-radius: 8px; font-size: 0.95rem; }
+        .site-dropdown a:hover { background: #f5f5f7; }
+        .site-dropdown a.active { color: #111; background: #f0f0f0; }
+
+        .toolbar-btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-dark { background: #111; color: #fff; }
+        .btn-light { background: #fff; color: #444; border: 1px solid #ddd; }
+
+        /* 검색 바 */
+        .review-search { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; background: #fff; border: 1px solid #e5e5e5; border-radius: 16px; padding: 18px 20px; margin-bottom: 24px; }
+        .review-search .field { display: flex; flex-direction: column; gap: 5px; }
+        .review-search label { font-size: 0.72rem; font-weight: 700; color: #888; text-transform: uppercase; }
+        .review-search input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95rem; }
+        .review-search input#r-ticker { text-transform: uppercase; width: 140px; font-weight: 700; }
+        .review-hint { font-size: 0.78rem; color: #aaa; margin: -14px 0 24px 4px; }
+
+        /* 단일 카드 영역 (전체 폭 사용) */
+        #review-card { display: block; }
+        #review-card .stock-card { max-width: 100%; }
+
+        /* 수익률 요약 */
+        #review-summary { display: none; margin-bottom: 16px; }
+        .rev-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .rev-metric { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px 14px; }
+        .rev-metric .lbl { font-size: 0.7rem; color: #999; font-weight: 700; text-transform: uppercase; }
+        .rev-metric .val { font-size: 1.15rem; font-weight: 800; margin-top: 3px; }
+
+        /* 지표(4번째) 차트 패널 */
+        .layer-ind { height: 150px; }
+        .indicator-item.active { background: #ede9fe; outline: 2px solid #7c3aed; }
+
+        /* 보유 종목 불러오기 드롭다운 */
+        .load-wrap { position: relative; }
+        .load-panel { display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 2000; min-width: 240px; max-height: 360px; overflow-y: auto; padding: 6px; }
+        .load-item { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
+        .load-item:hover { background: #f5f5f7; }
+        .load-item .li-tk { font-weight: 800; font-size: 0.95rem; }
+        .load-item .li-meta { font-size: 0.75rem; color: #999; margin-top: 2px; }
+        .load-empty { padding: 14px; color: #888; font-size: 0.85rem; text-align: center; }
+
+        /* 메모 박스 (차트와 동일하게 전체 폭) */
+        .memo-box { background: #fff; border: 1px solid #e5e5e5; border-radius: 16px; padding: 18px 20px; margin-top: 20px; display: none; }
+        .memo-box h3 { margin: 0 0 4px; font-weight: 800; font-size: 1.05rem; }
+        .memo-box .sub { font-size: 0.8rem; color: #999; margin-bottom: 12px; }
+        .memo-box textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 0.95rem; font-family: inherit; resize: vertical; min-height: 60px; }
+        .memo-box .memo-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+        /* 복기 기록 리스트 */
+        .review-list-wrap { margin-top: 40px; }
+        .review-list-wrap h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 16px; }
+        .review-item { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; cursor: pointer; transition: box-shadow 0.15s; }
+        .review-item:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+        .review-item .ri-main { min-width: 0; }
+        .review-item .ri-tk { font-weight: 800; font-size: 1.05rem; }
+        .review-item .ri-date { font-size: 0.78rem; color: #999; margin-left: 8px; font-weight: 600; }
+        .review-item .ri-memo { font-size: 0.88rem; color: #555; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .review-item .ri-del { border: none; background: #f2f2f2; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.78rem; font-weight: 700; color: #888; flex-shrink: 0; }
+        .review-item .ri-del:hover { background: #ffe5e3; color: #ff3b30; }
+
+        .chartset-wrap { position: relative; }
+        .chartset-panel { display:none; position:absolute; top:100%; right:0; margin-top:8px; background:white; border:1px solid #e5e5e5; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.12); padding:14px; z-index:2000; min-width:200px; text-align:left; }
+        .filt-row { display:flex; align-items:center; gap:6px; padding:5px 0; font-size:0.85rem; font-weight:600; cursor:pointer; }
+        .filt-hint { color:#aaa; font-weight:400; font-size:0.72rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="site-nav">
+                <button class="site-nav-btn" onclick="toggleSiteDropdown()">🔍 Review</button>
+                <div id="site-dropdown" class="site-dropdown">
+                    <a href="/stock">📈 Overview</a>
+                    <a href="/mdd">📊 MDD</a>
+                    <a href="/record">📝 Record</a>
+                    <a href="/review" class="active">🔍 Review</a>
+                    <a href="/log">🧾 Log</a>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <div class="load-wrap">
+                <button class="toolbar-btn btn-dark" onclick="toggleLoadPanel()">📥 보유 종목 불러오기</button>
+                <div id="load-panel" class="load-panel"></div>
+              </div>
+              <div class="chartset-wrap">
+                <button class="toolbar-btn btn-light" onclick="toggleChartSet()">차트 설정</button>
+                <div id="chartset-panel" class="chartset-panel">
+                    <div style="font-weight:700; margin-bottom:8px; font-size:0.9rem;">차트 표시</div>
+                    <label class="filt-row"><input type="checkbox" id="cs-bb" onchange="onChartSetChange()"> 볼린저밴드 <span class="filt-hint">빨강·파랑·음영</span></label>
+                    <label class="filt-row"><input type="checkbox" id="cs-ma5" onchange="onChartSetChange()"> 5일선</label>
+                    <label class="filt-row"><input type="checkbox" id="cs-ma20" onchange="onChartSetChange()"> 20일선</label>
+                    <label class="filt-row"><input type="checkbox" id="cs-ma60" onchange="onChartSetChange()"> 60일선</label>
+                    <label class="filt-row"><input type="checkbox" id="cs-ma120" onchange="onChartSetChange()"> 120일선</label>
+                </div>
+              </div>
+            </div>
+        </div>
+
+        <div class="review-search">
+            <div class="field">
+                <label>종목 (Ticker)</label>
+                <input id="r-ticker" placeholder="AAPL" onkeydown="if(event.key==='Enter') runReview()">
+            </div>
+            <div class="field">
+                <label>진입일 <span style="font-weight:400;color:#bbb;font-size:0.68rem;">미국 거래일(기록 날짜)</span></label>
+                <input id="r-date" type="date" onkeydown="if(event.key==='Enter') runReview()">
+            </div>
+            <div class="field">
+                <label>수량 (주) <span style="font-weight:400;color:#bbb;font-size:0.68rem;">소수점 가능</span></label>
+                <input id="r-qty" type="number" step="any" placeholder="0.22" style="width:110px;" onkeydown="if(event.key==='Enter') runReview()">
+            </div>
+            <div class="field">
+                <label>매매 금액 (총액)</label>
+                <input id="r-amount" type="number" step="any" placeholder="100" style="width:120px;" onkeydown="if(event.key==='Enter') runReview()">
+            </div>
+            <div class="field">
+                <label>수수료 <span style="font-weight:400;color:#bbb;font-size:0.68rem;">기본 0</span></label>
+                <input id="r-fee" type="number" step="any" placeholder="0" style="width:90px;" onkeydown="if(event.key==='Enter') runReview()">
+            </div>
+            <button class="toolbar-btn btn-dark" onclick="runReview()">복기하기</button>
+        </div>
+        <div class="review-hint">진입 직전부터 현재까지의 차트를 보여주고, 매수 시점은 보라색 수직선으로 표시합니다. 수량·매매금액을 넣으면 수익률도 계산됩니다.</div>
+
+        <div id="review-summary"></div>
+        <div id="review-card"></div>
+
+        <div id="memo-box" class="memo-box">
+            <h3 id="memo-title">진입 사유 복기</h3>
+            <div class="sub">이 자리에서 왜 매수했는지 — 근거/판단/감정 등 짧게.</div>
+            <textarea id="memo-text" placeholder="예) 20일선 지지 + RSI 과매도 반등 시도, 골든크로스 직전이라 분할 1차 진입"></textarea>
+            <div class="memo-actions">
+                <button class="toolbar-btn btn-dark" onclick="saveMemo()">저장</button>
+            </div>
+        </div>
+
+        <div class="review-list-wrap">
+            <h2>📒 복기 기록</h2>
+            <div id="review-list"><div class="loading" style="grid-column:auto; padding:30px;">불러오는 중...</div></div>
+        </div>
+    </div>
+
+    <div id="error-popup">
+        <div class="error-icon">!</div>
+        <div id="error-message">문제가 발생했습니다.</div>
+    </div>
+    <div id="toast"></div>
+
+    <!-- Stock Overview의 차트 렌더러 재사용 -->
+    <script src="/static/charts_main.js?v=1.14"></script>
+    <script src="/static/charts_macd.js?v=1.14"></script>
+    <script src="/static/charts_vol.js?v=1.14"></script>
+    <script src="/static/charts_popup.js"></script>
+    <script src="/review-static/review.js?v=1.20"></script>
+    <script>
+        function toggleSiteDropdown() {
+            const d = document.getElementById('site-dropdown');
+            d.style.display = d.style.display === 'block' ? 'none' : 'block';
+        }
+        window.onclick = function(event) {
+            if (!event.target.closest('.site-nav')) {
+                document.getElementById('site-dropdown').style.display = 'none';
+            }
+            if (!event.target.closest('.chartset-wrap')) {
+                const cp = document.getElementById('chartset-panel');
+                if (cp) cp.style.display = 'none';
+            }
+            if (!event.target.closest('.load-wrap')) {
+                const lp = document.getElementById('load-panel');
+                if (lp) lp.style.display = 'none';
+            }
+        }
+        function toggleChartSet() {
+            const p = document.getElementById('chartset-panel');
+            p.style.display = p.style.display === 'block' ? 'none' : 'block';
+        }
+        function initChartSet() {
+            const o = getChartOpts();
+            ['bb', 'ma5', 'ma20', 'ma60', 'ma120'].forEach(k => {
+                const el = document.getElementById('cs-' + k);
+                if (el) el.checked = !!o[k];
+            });
+        }
+        function onChartSetChange() {
+            ['bb', 'ma5', 'ma20', 'ma60', 'ma120'].forEach(k => {
+                const el = document.getElementById('cs-' + k);
+                if (el) setChartOpt(k, el.checked);
+            });
+            if (typeof rerenderCard === 'function') rerenderCard();
+        }
+        document.addEventListener('DOMContentLoaded', initChartSet);
+    </script>
+</body>
+</html>

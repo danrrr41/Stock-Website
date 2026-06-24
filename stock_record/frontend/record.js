@@ -2,9 +2,27 @@
 let positionsCache = [];
 let fuCache = {};        // key -> followup 데이터 (지표 미니차트 팝업용)
 let popupCharts = {};    // key -> 현재 열린 팝업 ApexCharts 인스턴스
+let reviewsList = [];    // 복기(Review) 기록 — 포지션 카드에 메모 표시용
 
 function getUid() { return sessionStorage.getItem('user_id') || ''; }
 function safeKey(ticker) { return String(ticker).replace(/[^A-Za-z0-9]/g, '_'); }
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// 해당 종목의 복기 메모 — 매수일(date)과 같은 복기 우선, 없으면 가장 최근 복기.
+function reviewMemoFor(ticker, date) {
+    const forT = reviewsList.filter(r => r.ticker === ticker && r.memo);
+    if (!forT.length) return '';
+    const exact = forT.find(r => r.date === date);
+    return (exact || forT[0]).memo;
+}
+
+// 복기(Review)로 이동 — 티커/최초매수일/수량/매매금액(평단×수량, 수수료 포함)/수수료 전달
+function goReview(ticker, date, qty, avg, fee) {
+    const amount = (avg * qty).toFixed(2);
+    const f = (fee || 0).toFixed(2);
+    location.href = `/review?ticker=${encodeURIComponent(ticker)}&date=${date || ''}&qty=${qty}&amount=${amount}&fee=${f}`;
+}
 
 // ===== 차트 표시 옵션 (이평선 / 볼린저밴드 토글) — Stock Overview와 동일 키 공유 =====
 const CHART_OPTS_KEY = 'chartOpts';
@@ -62,9 +80,13 @@ function fmtMoney(v, sym) {
 async function loadPositions() {
     const grid = document.getElementById('record-grid');
     try {
-        const res = await fetch(`/api/positions?uid=${getUid()}`);
-        if (!res.ok) throw new Error('목록 로드 실패');
-        positionsCache = await res.json();
+        const [posRes, revRes] = await Promise.all([
+            fetch(`/api/positions?uid=${getUid()}`),
+            fetch(`/api/review/list?uid=${getUid()}`)
+        ]);
+        if (!posRes.ok) throw new Error('목록 로드 실패');
+        positionsCache = await posRes.json();
+        try { reviewsList = (await revRes.json()).reviews || []; } catch (_) { reviewsList = []; }
         renderBlocks(positionsCache);
     } catch (e) {
         showError(e.message);
@@ -81,6 +103,7 @@ function renderBlocks(positions) {
     }
     positions.forEach(pos => {
         const key = safeKey(pos.ticker);
+        const rmemo = reviewMemoFor(pos.ticker, pos.first_buy);
         const card = document.createElement('div');
         card.className = 'stock-card';
         card.innerHTML = `
@@ -90,7 +113,9 @@ function renderBlocks(positions) {
                     <span class="company-name" id="name-${key}">${pos.name || pos.ticker}</span>
                     <span class="rec-buyinfo">보유 ${pos.quantity}주 · 최초매수 ${pos.first_buy || '-'}</span>
                 </div>
+                <button class="rec-review-btn" title="이 종목 매수 시점 복기" onclick="goReview('${pos.ticker}','${pos.first_buy || ''}',${pos.quantity},${pos.avg_price},${pos.fee || 0})">🔍 복기</button>
             </div>
+            <div class="rec-review-memo" title="복기 메모">${rmemo ? '📝 ' + escapeHtml(rmemo) : '<span class="rmemo-empty">복기 메모 없음 · 🔍 복기에서 작성</span>'}</div>
             <div class="rec-summary" id="summary-${key}">
                 <div class="rec-metric"><div class="lbl">로딩 중...</div><div class="val">·</div></div>
             </div>

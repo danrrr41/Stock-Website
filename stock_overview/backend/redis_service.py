@@ -1,6 +1,7 @@
 import redis
 import json
 import os
+from datetime import datetime, timezone, timedelta
 
 # Vercel이 주는 KV_URL을 먼저 찾고, 없으면 REDIS_URL을 찾도록 유연하게 변경
 REDIS_URL = os.getenv("KV_URL") or os.getenv("REDIS_URL")
@@ -27,6 +28,7 @@ def key_tickers(list_type: str, uid: str = None) -> str:
 
 def key_records(uid: str) -> str: return f"record:{uid}"
 def key_ledger(uid: str) -> str: return f"ledger:{uid}"
+def key_review(uid: str) -> str: return f"review:{uid}"
 # Follow Up 전용 장기 히스토리 캐시 (기록된 종목만, 매수일까지 커버)
 def key_rec_ohlcv(ticker: str) -> str: return f"rec_ohlcv:{ticker}"
 
@@ -80,6 +82,15 @@ def save_ledger(uid: str, entries: list):
     client.set(key_ledger(uid), json.dumps(entries))
 
 
+# --- 복기(Review) 기록 (uid별) ---------------------------------------------
+def get_reviews(uid: str) -> list:
+    data = client.get(key_review(uid))
+    return json.loads(data) if data else []
+
+def save_reviews(uid: str, reviews: list):
+    client.set(key_review(uid), json.dumps(reviews))
+
+
 # --- Follow Up 장기 히스토리 캐시 (전역, 기록된 종목만) -----------------------
 def get_rec_ohlcv(ticker: str) -> dict:
     data = client.get(key_rec_ohlcv(ticker))
@@ -90,3 +101,21 @@ def save_rec_ohlcv(ticker: str, obj: dict):
 
 def delete_rec_ohlcv(ticker: str):
     client.delete(key_rec_ohlcv(ticker))
+
+
+# --- 활동 로그 (전역) — 데이터 다운로드/크론/새로고침 추적 -----------------------
+# Vercel 로그는 보존 기간이 짧고 유료라, 자체적으로 Redis 리스트에 최근 1000건 보관.
+def add_log(msg: str):
+    try:
+        ts = (datetime.now(timezone.utc) + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")  # KST
+        client.lpush("logs", json.dumps({"ts": ts, "msg": msg}))
+        client.ltrim("logs", 0, 999)
+    except Exception:
+        pass  # 로깅 실패가 앱 동작을 막지 않도록
+
+def get_logs(limit: int = 300) -> list:
+    try:
+        data = client.lrange("logs", 0, max(0, limit - 1))
+        return [json.loads(d) for d in data]
+    except Exception:
+        return []

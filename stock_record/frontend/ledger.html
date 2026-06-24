@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>매매 기록 - Stock Record</title>
+    <title>매매 기록 - Record</title>
     <link rel="stylesheet" href="/static/style.css">
     <script>
         if (sessionStorage.getItem('site_auth') !== 'true' || !sessionStorage.getItem('user_id')) {
@@ -52,9 +52,11 @@
             <div class="site-nav">
                 <button class="site-nav-btn" onclick="toggleSiteDropdown()">📒 매매 기록</button>
                 <div id="site-dropdown" class="site-dropdown">
-                    <a href="/stock">📈 Stock Overview Pro</a>
-                    <a href="/mdd">📊 MDD Calculator Pro</a>
-                    <a href="/record" class="active">📝 Stock Record</a>
+                    <a href="/stock">📈 Overview</a>
+                    <a href="/mdd">📊 MDD</a>
+                    <a href="/record" class="active">📝 Record</a>
+                    <a href="/review">🔍 Review</a>
+                    <a href="/log">🧾 Log</a>
                 </div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">

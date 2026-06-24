@@ -2,7 +2,6 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 import numpy as np
-import concurrent.futures
 import os
 from typing import Optional
 from . import redis_service
@@ -89,10 +88,12 @@ def calculate_indicators(df):
     
     return df
 
-def generate_stock_json(orig_ticker, norm_ticker, df, name=None):
-    """응답용 완성형 JSON 생성"""
-    t_df = df.tail(60).copy()
+def generate_stock_json(orig_ticker, norm_ticker, df, name=None, count=60):
+    """응답용 완성형 JSON 생성. count = 표시할 마지막 봉 개수(기본 60).
+    모든 시계열 배열을 동일 길이(n)로 맞춰 프론트에서 dates[i]와 정렬되게 한다."""
+    t_df = df.tail(count).copy()
     if t_df.empty: return None
+    n = len(t_df)
 
     curr_c = t_df['close'].iloc[-1]
     prev_c = t_df['close'].iloc[-2] if len(t_df) > 1 else curr_c
@@ -113,8 +114,9 @@ def generate_stock_json(orig_ticker, norm_ticker, df, name=None):
             "c": round(float(row['close']), 2)
         })
 
-    def clean_list(series, count=60):
-        return series.ffill().bfill().fillna(0).tail(count).round(2).tolist()
+    def clean_list(series, c=None):
+        c = n if c is None else c
+        return series.ffill().bfill().fillna(0).tail(c).round(2).tolist()
 
     if name is None:
         name = orig_ticker
@@ -132,21 +134,21 @@ def generate_stock_json(orig_ticker, norm_ticker, df, name=None):
         "ma20": clean_list(t_df['ma20']),
         "ma60": clean_list(t_df['ma60']),
         "ma120": clean_list(t_df['ma120']) if 'ma120' in t_df else [],
-        "bb_upper": clean_list(t_df[bbu_col]) if bbu_col else [0]*60,
-        "bb_lower": clean_list(t_df[bbl_col]) if bbl_col else [0]*60,
-        "macd": clean_list(t_df[m_col]) if m_col in t_df else [0]*60,
-        "macd_signal": clean_list(t_df[ms_col]) if ms_col in t_df else [0]*60,
-        "macd_hist": clean_list(t_df[mh_col]) if mh_col in t_df else [0]*60,
+        "bb_upper": clean_list(t_df[bbu_col]) if bbu_col else [0]*n,
+        "bb_lower": clean_list(t_df[bbl_col]) if bbl_col else [0]*n,
+        "macd": clean_list(t_df[m_col]) if m_col in t_df else [0]*n,
+        "macd_signal": clean_list(t_df[ms_col]) if ms_col in t_df else [0]*n,
+        "macd_hist": clean_list(t_df[mh_col]) if mh_col in t_df else [0]*n,
         "volume": t_df['volume'].fillna(0).tolist(),
         "vol_ma5": clean_list(t_df['vol_ma5']),
         "vol_ma20": clean_list(t_df['vol_ma20']),
         "dates": t_df.index.strftime('%Y-%m-%d').tolist(),
-        "rsi_list": clean_list(t_df['rsi_final'], 60),
-        "mfi_list": clean_list(t_df['mfi_final'], 60),
-        "adx_list": clean_list(t_df[adx_col], 60) if adx_col else [0]*60,
-        "di_plus_list": clean_list(t_df[dmp_col], 60) if dmp_col else [0]*60,
-        "di_minus_list": clean_list(t_df[dmn_col], 60) if dmn_col else [0]*60,
-        "pb_list": clean_list(t_df[pb_col], 60) if pb_col else [0]*60,
+        "rsi_list": clean_list(t_df['rsi_final']),
+        "mfi_list": clean_list(t_df['mfi_final']),
+        "adx_list": clean_list(t_df[adx_col]) if adx_col else [0]*n,
+        "di_plus_list": clean_list(t_df[dmp_col]) if dmp_col else [0]*n,
+        "di_minus_list": clean_list(t_df[dmn_col]) if dmn_col else [0]*n,
+        "pb_list": clean_list(t_df[pb_col]) if pb_col else [0]*n,
         "dates_60": t_df.index.strftime('%Y-%m-%d').tolist()
     }
 
@@ -192,6 +194,12 @@ def update_all_stocks(list_type: Optional[str] = None, uid: Optional[str] = None
                 orig = ticker_map[norm]
                 new_df = downloaded if len(norm_tickers) == 1 else (downloaded[norm] if norm in downloaded else pd.DataFrame())
                 if new_df.empty: continue
+
+                # [버그 수정] 단일 종목 + group_by='ticker'면 yfinance가 MultiIndex 컬럼(티커,필드)
+                # 을 반환 → to_dict()의 키가 튜플이 되어 JSON 저장 실패. 필드명만 남겨 평탄화.
+                if isinstance(new_df.columns, pd.MultiIndex):
+                    new_df = new_df.copy()
+                    new_df.columns = new_df.columns.get_level_values(-1)
 
                 # 종목명 가져오기 (Redis 캐시 활용)
                 name = redis_service.get_name(orig)
@@ -251,6 +259,7 @@ def update_all_stocks(list_type: Optional[str] = None, uid: Optional[str] = None
                     updated_count += 1
         except Exception as e:
             print(f"Batch update error ({i}-{i+batch_size}): {e}")
+            redis_service.add_log(f"[오류] 데이터 다운로드 배치 {i}-{i+batch_size}: {e}")
 
     return {"updated": updated_count, "initial": initial_count, "incremental": incremental_count}
 
@@ -291,6 +300,7 @@ def get_stock_data(list_type="bookmark", uid=None, realtime=True):
 
 def get_one_fresh(orig: str):
     """단일 종목을 즉석 재계산(오늘 봉 포함)하고 실시간가 반영해 반환."""
+    redis_service.add_log(f"[새로고침] {orig} 단일 재계산(다운로드)")
     update_all_stocks(tickers=[orig])
     data = redis_service.get_stock_data(orig)
     if not data:
